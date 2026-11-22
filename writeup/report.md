@@ -1,6 +1,6 @@
 # BMI/CS 771 Fall 2026 — Homework 3 Report: Image Generation with Diffusion and Flow Matching Models
 
-**Team:** Ashvin, Akshat, Shubhangi (GitHub: `shubhangikatariyar`)  
+**Team:** Ashvin, Akshat, Shubhangi  
 **Date:** November 2026
 
 ---

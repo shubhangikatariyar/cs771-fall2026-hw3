@@ -1,9 +1,9 @@
 # CS 771 Fall 2026 — Homework 3: Image Generation with Diffusion and Flow Matching Models
 
-PyTorch implementation for **BMI/CS 771 HW3**. This project explores two prominent families of deep generative models: **Denoising Diffusion Probabilistic Models (DDPMs)** and **Flow Matching (FM) with Rectified Flow**. We implement training objectives and sampling algorithms for both models, coupled with two prediction backbones: convolutional **U-Net** and Transformer-based **Vision Transformer (LightningDiT)**, for class-conditional image synthesis on **MNIST** (pixel space) and **MiniImageNet** (latent space via pretrained TAESD autoencoder).
+PyTorch implementation for **BMI/CS 771 HW3**. This project explores two families of deep generative models: **Denoising Diffusion Probabilistic Models (DDPMs)** and **Flow Matching (FM) with Rectified Flow**. We implement training objectives and sampling algorithms for both models, coupled with two prediction backbones: convolutional **U-Net** and Transformer-based **Vision Transformer (LightningDiT)**, for class-conditional image synthesis on **MNIST** (pixel space) and **MiniImageNet** (latent space via pretrained TAESD autoencoder).
 
 - **Points:** 12 core points + up to 4 bonus points
-- **Team:** Ashvin, Akshat, Shubhangi (GitHub: `shubhangikatariyar`)
+- **Team:** Ashvin, Akshat, Shubhangi
 - **Plan & Task Assignment:** see [PLAN.md](PLAN.md)
 - **Report & Writeup:** see [writeup/report.md](writeup/report.md)
 
@@ -11,7 +11,7 @@ PyTorch implementation for **BMI/CS 771 HW3**. This project explores two promine
 
 ## 1. What Needs to Be Done
 
-All core implementation is strictly confined to **four files** in `code/libs/`:
+All implementation happens in **four files** under `code/libs/`. Everything else is provided.
 
 ### Summary of Implementation Tasks
 
@@ -79,10 +79,6 @@ All core implementation is strictly confined to **four files** in `code/libs/`:
 Install dependencies listed in `requirements.txt`:
 
 ```bash
-# Clone the repository
-git clone https://github.com/shubhangikatariyar/cs771-fall2026-hw3.git
-cd cs771-fall2026-hw3
-
 # Create and activate virtual environment (optional)
 python3 -m venv venv
 source venv/bin/activate
@@ -93,8 +89,8 @@ pip install -r requirements.txt
 
 ### Device Selection
 By default, configurations run on CUDA: `devices: ["cuda:0"]`.
-- For CPU debugging: override `devices: ["cpu"]`.
-- For Apple Silicon Mac: override `devices: ["mps"]`.
+- For CPU debugging: set `devices: ["cpu"]` in your YAML config.
+- For Apple Silicon Mac: set `devices: ["mps"]` in your YAML config.
 
 ---
 
@@ -182,7 +178,7 @@ Training generates sample grids named `sample-<epoch>.png` in the experiment dir
 1. Create a feature branch:
    ```bash
    git checkout -b feat/<feature-name>
-   # Examples: feat/vit-backbone, feat/unet-backbone, feat/ddpm, feat/fm, feat/latent-vae
+   # Examples: feat/vit, feat/unet, feat/ddpm, feat/fm, feat/latent
    ```
 2. Commit and push your changes:
    ```bash
@@ -190,9 +186,8 @@ Training generates sample grids named `sample-<epoch>.png` in the experiment dir
    git commit -m "feat(module): descriptive message"
    git push -u origin feat/<feature-name>
    ```
-3. Open a Pull Request on GitHub and assign teammates as reviewers.
+3. Open a Pull Request on GitHub and request a review from a teammate.
 4. Require at least **one peer review and approval** before merging into `main`.
-5. Merge via squash-merge or standard merge.
 
 ---
 
@@ -211,4 +206,4 @@ Before submitting on Canvas:
    - `code/`
    - `writeup/`
    - `results/`
-7. **Every team member must submit the same `submission.zip` and `report.pdf` on Canvas.**
+7. All team members submit the same `submission.zip` and `report.pdf` on Canvas.
