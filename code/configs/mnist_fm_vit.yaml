@@ -1,0 +1,9 @@
+output_folder: "../logs"
+model_type: "FM"
+dataset:
+  name: "MNIST"
+  data_folder: "../data"
+model:
+  arch_type: "ViT"
+  timesteps: 10
+  

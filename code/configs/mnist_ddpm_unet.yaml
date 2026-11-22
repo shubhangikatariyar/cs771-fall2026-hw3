@@ -1,0 +1,8 @@
+output_folder: "../logs"
+model_type: "DDPM"
+dataset:
+  name: "MNIST"
+  data_folder: "../data"
+model:
+  arch_type: "UNet"
+  timesteps: 500

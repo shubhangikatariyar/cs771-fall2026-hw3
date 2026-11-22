@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Datasets (downloaded by torchvision / Hugging Face datasets; do not commit per submission rules)
+data/
+code/data/
+*.tar
+*.tar.gz
+*.zip
+!submission.zip
+
+# Training outputs (assignment rules: do NOT submit logs/ or models/)
+logs/
+models/
+code/logs/
+code/models/
+*.log
+*.out
+*.err
+
+# Checkpoints
+*.pth
+*.pth.tar
+
+# Keep pretrained TAESD weights provided in starter zip
+!pretrained/
+!pretrained/*.pth
+
+# results/ IS part of the submission (configs, training logs, final checkpoints)
+!results/**
+# ...but keep intermediate epoch checkpoints out
+results/**/epoch_*.pth
+results/**/epoch_*.pth.tar
+
+# Temporary submission artifacts
+temp_submission/
+reproduced/
