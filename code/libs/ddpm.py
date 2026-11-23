@@ -170,8 +170,20 @@ class DDPM(nn.Module):
     def compute_loss(self, x_start, label, noise=None):
         """
         Compute the simplified loss for training the model.
-        Fill in the missing code here. Algorithm 1 line 5 in the paper.
+        Algorithm 1 line 5 in the paper.
         """
+        # t ~ Uniform{0, ..., T-1}, one per example
+        t = torch.randint(
+            0, self.timesteps, (x_start.shape[0],), device=x_start.device
+        ).long()
+        # epsilon ~ N(0, I)
+        if noise is None:
+            noise = torch.randn_like(x_start)
+        # x_t = sqrt(abar_t) x_0 + sqrt(1 - abar_t) eps
+        x_noisy = self.q_sample(x_start, t, noise=noise)
+        # predict the noise and regress against the true noise
+        predicted_noise = self.model(x_noisy, label, t)
+        loss = F.mse_loss(predicted_noise, noise)
         return loss
 
     @torch.no_grad()
@@ -193,10 +205,20 @@ class DDPM(nn.Module):
         sqrt_recip_alphas_t = self._extract(self.sqrt_recip_alphas, t, x.shape)
 
         """
-        Fill in the missing code here. See Equation 11 in DDPM paper.
-        See https://arxiv.org/pdf/2207.12598 for classifier free guidance (cfg)
+        Equation 11 in DDPM paper. (CFG bonus not implemented here.)
         """
-        return x
+        # predicted noise eps_theta(x_t, c, t)
+        eps = self.model(x, label, t)
+        # posterior mean mu_theta
+        model_mean = sqrt_recip_alphas_t * (
+            x - betas_t * eps / sqrt_one_minus_alphas_cumprod_t
+        )
+        if t_index == 0:
+            # no noise added at the final step
+            return model_mean
+        posterior_variance_t = self._extract(self.posterior_variance, t, x.shape)
+        noise = torch.randn_like(x)
+        return model_mean + torch.sqrt(posterior_variance_t) * noise
 
     @torch.no_grad()
     @sampling_mode
@@ -218,8 +240,11 @@ class DDPM(nn.Module):
         imgs = torch.randn(shape, device=device)
 
         """
-        Fill in the missing code here. See Algorithm 2 in DDPM paper.
+        Algorithm 2 in DDPM paper: iterate t = T-1, ..., 0.
         """
+        for i in reversed(range(self.timesteps)):
+            t = torch.full((len(labels),), i, device=device, dtype=torch.long)
+            imgs = self.p_sample(imgs, labels, t, i)
         
         # postprocessing the images
         imgs = self.postprocess(imgs)

@@ -47,3 +47,5 @@ results/**/epoch_*.pth.tar
 # Temporary submission artifacts
 temp_submission/
 reproduced/
+chtc_logs/
+hw3_code.tar.gz
