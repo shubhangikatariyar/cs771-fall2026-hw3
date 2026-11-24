@@ -35,17 +35,19 @@ if [ ${#tarballs[@]} -eq 0 ]; then
 fi
 
 for tb in "${tarballs[@]}"; do
-    tar xzf "$tb" -C .   # tarball contains logs/<experiment>/...
+    tar xzf "$tb" -C . --exclude job_output.txt   # tarball contains logs/<experiment>/...
 done
 
 for exp in logs/*/; do
     name="$(basename "$exp")"
     # newest epoch checkpoint = final model
-    final="$(find "$exp" -name 'epoch_*.pth.tar' | sort | tail -n 1)"
+    # (train.py also writes model_final.pth.tar, which is kept; epoch_* is then dropped)
+    final="$(find "$exp" -name 'model_final.pth.tar' | head -n 1)"
+    [ -z "$final" ] && final="$(find "$exp" -name 'epoch_*.pth.tar' | sort | tail -n 1)"
     excludes=()
     while IFS= read -r ck; do
         [ "$ck" != "$final" ] && excludes+=(--exclude "$(basename "$ck")")
-    done < <(find "$exp" -name 'epoch_*.pth.tar')
+    done < <(find "$exp" -name 'epoch_*.pth.tar' -o -name 'model_final.pth.tar')
     rsync -a "${excludes[@]}" "$exp" "results/$name/"
     echo "results/$name  (final checkpoint: $(basename "${final:-none}"))"
 done
