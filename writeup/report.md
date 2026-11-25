@@ -36,21 +36,25 @@ The concatenation is why each decoder residual block expects twice as many input
 
 **How the class gets in.** The label goes through an embedding table and a two-layer projection, giving a single context vector. The spatial transformers use it as the key and value in cross-attention, with image features as queries. Since there is only one context token, the attention weight on it is always 1, so in practice every position receives the same projected class vector. Attention levels are the two higher resolutions plus the middle block. During training the label is dropped 10% of the time, which is what classifier-free guidance needs later.
 
-### 1.2 Vision Transformer Forward Pass (`libs/vit.py` - LightningDiT)
-Our Vision Transformer adapts the Diffusion Transformer (DiT) architecture (Peebles & Xie, ICCV 2023):
+### 1.2 Vision Transformer Forward Pass (`libs/vit.py`, LightningDiT)
 
-- **Patchification & Positional Encoding:** The input image/latent $x \in \mathbb{R}^{B \times C \times H \times W}$ is partitioned into non-overlapping patches of size $p \times p$ (default $p=2$) via convolutional projection `x_embedder`, producing a sequence of tokens $Z \in \mathbb{R}^{B \times T \times D}$ where $T = (H/p)(W/p)$. Standard 2D learnable positional embeddings `pos_embed` are added directly.
-- **adaLN-Zero Conditioning:** Rather than concatenating tokens, time embedding $t$ and label embedding $y$ are summed ($c_{\text{cond}} = t + y \in \mathbb{R}^{N \times D}$) and fed into an adaptive layer normalization (adaLN-Zero) modulation mechanism. For each DiT block, $c_{\text{cond}}$ regresses six modulation parameters: scale and shift $(\gamma_1, \beta_1)$ and gate $\alpha_1$ for self-attention, plus $(\gamma_2, \beta_2)$ and gate $\alpha_2$ for the MLP. Crucially, the gate parameters are initialized to zero, ensuring that each block starts as an identity function during training initialization.
-- **Forward Pass Implementation:**
-  ```python
-  c = t + y
-  for block in self.blocks:
-      x = block(x, c)
-  x = self.final_layer(x, c)
-  x = self.unpatchify(x)
-  return x
-  ```
-  After $L$ DiT blocks, `DiTDecodingLayer` applies adaptive layer norm modulation from $c$, followed by linear projection to $p^2 \cdot C$ channels, and `unpatchify` rearranges the sequence back to spatial dimension $(B, C, H, W)$.
+The second backbone is a Diffusion Transformer [Peebles & Xie, ICCV 2023] with a few changes that come with the starter code. With the MNIST settings (8 blocks, width 192, 4 heads, patch size 2) it has about 5.50M trainable parameters. The MiniImageNet config uses 12 blocks and width 288, about 18.35M parameters.
+
+- **Patches:** a strided convolution (`x_embedder`) turns the input into tokens $Z \in \mathbb{R}^{B \times T \times D}$ with $T = (H/p)(W/p)$ and $p = 2$. That is 196 tokens for MNIST and 64 for the MiniImageNet latents.
+- **Position embeddings:** `pos_embed` is a **fixed** 2D sinusoidal embedding, stored as a buffer and not trained. Half of the channels encode the column and half encode the row. It is added to the tokens once, before the first block.
+- **Rotary embeddings:** each attention layer also applies 2D rotary position embeddings (RoPE) to the queries and keys. Unlike `pos_embed`, the RoPE frequencies are **learnable**.
+- **Block design:** the blocks use RMSNorm, RMSNorm on queries and keys (QK-norm), and a SwiGLU feed-forward layer.
+- **Time and class:** the two embeddings are summed, $c = t_{\text{emb}} + y_{\text{emb}}$. Each block uses $c$ to predict a shift, scale and gate for both attention and the feed-forward layer (adaLN-Zero). These modulation layers start at zero, so every block starts as the identity.
+
+```python
+c = t + y
+for block in self.blocks:
+    x = block(x, c)
+x = self.final_layer(x, c)
+x = self.unpatchify(x)
+```
+
+The final layer applies one more shift and scale from $c$ and projects each token to $p^2 \cdot C_{\text{latent or image}}$ values. `unpatchify` puts them back into shape $(B, C, H, W)$.
 
 ---
 
@@ -139,27 +143,37 @@ where unconditional evaluation passes $c = \text{num\_classes}$. When `use_vae=T
 
 With the same backbone, each network call costs about the same for both methods, so flow matching should sample roughly 50 times faster. This follows from the step counts; we have not timed it separately. The training losses of the two methods have different targets, so their values can't be compared directly.
 
-> **TODO (needs the MNIST FM runs):** add the FM loss curves and sample grids, then compare digit quality against the DDPM grids in Section 2.4.
+> **Not in the repo yet.** The MNIST FM runs are needed to finish this comparison. Shubhangi adds the `mnist_fm_vit` results and Akshat adds the `mnist_fm_unet` results to `results/` (loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`). Ashvin then adds the FM curves and grids here and compares digit quality with Section 2.4.
 
 ---
 
 ## 4. Latent Diffusion and Flow Matching on MiniImageNet (4 points)
 
 ### 4.1 Latent Space Modeling with TAESD
-Operating directly in pixel space on high-resolution datasets ($64 \times 64$ RGB) imposes steep computational and memory overheads. We leverage a pretrained Tiny AutoEncoder for Stable Diffusion (**TAESD**):
-- **Compression:** Compresses $3 \times 64 \times 64$ images into $4 \times 8 \times 8$ latent representations (an 8× spatial downsampling and $12\times$ dimensional reduction).
+Operating directly in pixel space on higher-resolution datasets ($128 \times 128$ RGB) imposes steep computational and memory overheads. We leverage a pretrained Tiny AutoEncoder for Stable Diffusion (**TAESD**):
+- **Compression:** Compresses $3 \times 128 \times 128$ images into $4 \times 16 \times 16$ latent representations (8× spatial downsampling on each side and $48\times$ fewer values).
 - **Integration:** In `compute_loss`, images are encoded without gradients: $z_0 = \text{self.vae.encode}(x_{\text{data}})$. Flow matching operates entirely in latent space. During `generate`, sampled latents $z_1$ are decoded back to pixel space via $\hat{x} = \text{self.vae.decode}(z_1)$ and clipped to $[0, 1]$.
 
-### 4.2 MiniImageNet Latent FM Results (80 Epochs)
+### 4.2 MiniImageNet Latent FM Results
 
-Both models were trained for 80 epochs on MiniImageNet using 10 Euler integration steps. Checkpoints evaluated via Exponential Moving Average (EMA) with `eval.py`:
+**Status: no MiniImageNet results are in the repo yet.** The table lists the configured settings. Training time and FID are left empty until the runs exist.
 
-| Model Architecture | Latent Space | Epochs | Steps | Training Time | Final FID Score ($\downarrow$) |
-|---|---|:---:|:---:|:---:|:---:|
-| **Latent FM + U-Net** | $4 \times 8 \times 8$ | 80 | 10 | *recorded* | *recorded* |
-| **Latent FM + ViT** | $4 \times 8 \times 8$ | 80 | 10 | *recorded* | *recorded* |
+| Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
 
-*(Include loss curves, sample grids for both backbones, and discussion of FID differences, parameter efficiency, and visual artifacts)*
+Still to be added:
+
+| What | Who |
+|---|---|
+| U-Net run: loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`, training time and GPU | Akshat |
+| ViT run: the same files and numbers | Shubhangi |
+| FID for both final EMA checkpoints from `eval.py` (5,000 images each), with the `eval.py` output saved | Akshat |
+| Training curves and sample grids in this section | each run's owner |
+| Comparison of quality and compute cost | Shubhangi (ViT), Akshat (U-Net) |
+
+For the baseline FID, `test_cfg.cfg` has to be set to `False`, because the code defaults turn guidance on (scale 2.5).
 
 ---
 
@@ -171,9 +185,16 @@ $$\tilde{v}_\theta(x_t, c, t) = v_\theta(x_t, \emptyset, t) + s \cdot \left(v_\t
 where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unconditional null-class token (supported via 10% label dropout during training).
 
 ### 5.2 Qualitative & Quantitative Evaluation
-We evaluate generation across guidance scales $s \in \{1.0, 2.0, 3.5\}$:
-- **FID Impact:** As guidance scale increases from $1.0$ to $2.5$, class alignment and subject contrast improve markedly, lowering the FID score. At excessively high scales ($s > 4.0$), mode collapse and high-frequency saturation artifacts emerge.
-- *(Insert side-by-side visual comparison showing unguided vs guided samples)*
+
+**Status: no guidance results are in the repo yet.** Guidance is implemented for flow matching (`libs/fm.py`), but there are no measurements to report.
+
+| What needs to be added (Akshat) | Details |
+|---|---|
+| Baseline FID | same checkpoints, `test_cfg.cfg: False` |
+| Guided FID | `test_cfg.cfg: True`, at each scale tested (for example 2.0, 2.5, 3.5), with `cfg_start_t` stated |
+| Sample grids | side by side, with and without guidance, same classes |
+| Discussion | image quality, match to the requested class, and diversity |
+| Files | configs and `eval.py` output in `results/` |
 
 ---
 
