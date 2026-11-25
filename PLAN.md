@@ -76,8 +76,8 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 
 ## DAY 2 — MNIST verification + launch overnight MiniImageNet
 
-**Status: READY TO TRAIN**
-- [ ] **Shubhangi:** Launch `mnist_fm_vit.yaml` on GPU / Colab / CHTC (30 epochs, 10 steps).
+**Status: IN PROGRESS**
+- [x] **Shubhangi:** Completed `mnist_fm_vit.yaml` (30 epochs, 28,125 iters, loss 0.159, deliverables staged in `results/mnist_fm_vit_20261125_153641/`).
 - [ ] **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (`configs/miniimagenet_fm_vit.yaml`, 80 epochs).
 
 **End-of-Day-2 checkpoint:** all code implemented; all MNIST runs complete; both 80-epoch MiniImageNet runs in progress. Start drafting writeup sections.
