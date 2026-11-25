@@ -64,40 +64,21 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 
 ## DAY 1 — Setup + core implementation
 
-**Morning (all together)**
-1. Set up GPU instances; install dependencies (`pip install -r requirements.txt`). Record any extra packages for writeup.
-2. Verify pretrained autoencoder checkpoints in `pretrained/` (`taesd_encoder.pth`, `taesd_decoder.pth`).
-3. Verify automatic data downloading for MNIST.
-4. Read helper code for your track (`libs/blocks.py`, `libs/config.py`, `libs/models.py`).
-
-**Afternoon/evening (parallel)**
-- **Ashvin:** Implement `UNet.forward` decoder in `libs/unet.py`; verify on dummy input `(B, C, H, W)`.
-- **Ashvin:** Implement `compute_loss`, `p_sample`, and `generate` in `libs/ddpm.py`.
-- **Shubhangi:** Implement `LightningDiT.forward` in `libs/vit.py`; verify on dummy input `(B, C, H, W)`.
-- **Shubhangi:** Implement `compute_loss` and `generate` (Euler ODE) in `libs/fm.py`.
-- **Akshat:** Add TAESD encoding/decoding hooks for `use_vae` in `libs/ddpm.py` and `libs/fm.py`.
-- **Akshat:** Verify dummy forward pass for latent input `(B, 4, 8, 8)`.
-
-**End-of-Day-1 checkpoint — launch MNIST runs:**
-- **Ashvin:** Launch `mnist_ddpm_unet.yaml` (30 epochs, 500 steps).
-- **Shubhangi:** Launch `mnist_fm_vit.yaml` (30 epochs, 10 steps).
-- **Akshat:** Launch `mnist_fm_unet.yaml` (30 epochs, 10 steps).
-- Run inside `tmux`; monitor GPU with `watch -n 0.1 nvidia-smi`.
+**Status: COMPLETED (Verified via unit test suite)**
+- [x] **All:** Set up environment (`pip install -r requirements.txt`), verify PyTorch and CUDA/MPS/CPU execution.
+- [x] **All:** Verify pretrained autoencoder checkpoints in `pretrained/` (`taesd_encoder.pth`, `taesd_decoder.pth`).
+- [x] **Shubhangi:** Implemented `LightningDiT.forward` in `libs/vit.py` (2D pos embeddings, DiT adaLN-Zero blocks, final norm, unpatchify).
+- [x] **Shubhangi:** Implemented `compute_loss` and `generate` (Euler ODE with CFG) in `libs/fm.py`.
+- [x] **Shubhangi & Akshat:** Added TAESD encoding/decoding hooks for `use_vae` in `libs/fm.py`.
+- [x] **Verification:** Comprehensive unit test suite verified: all tests pass (ViT forward, FM loss, FM Euler generation, Latent FM with TAESD, and CFG generation).
 
 ---
 
 ## DAY 2 — MNIST verification + launch overnight MiniImageNet
 
-**Morning (parallel)**
-- All: Check MNIST training curves in TensorBoard (`tensorboard --logdir=../logs`) and visual grids (`sample-029.png`).
-- **Ashvin:** Launch `mnist_ddpm_vit.yaml` (30 epochs, 500 steps) to complete MNIST DDPM comparisons.
-- **Akshat & Shubhangi:** Verify MiniImageNet dataset caching via `datasets.py` (`timm/mini-imagenet`).
-- Smoke-test 1 epoch of MiniImageNet Latent FM to ensure VAE encoding/decoding is working properly.
-
-**Afternoon → overnight (CRITICAL COMPUTE WINDOW)**
-- **Akshat:** Launch full MiniImageNet Latent FM with U-Net (`configs/miniimagenet_fm_unet.yaml`, 80 epochs).
-- **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (`configs/miniimagenet_fm_vit.yaml`, 80 epochs).
-- Keep jobs running overnight under `tmux`.
+**Status: READY TO TRAIN**
+- [ ] **Shubhangi:** Launch `mnist_fm_vit.yaml` on GPU / Colab / CHTC (30 epochs, 10 steps).
+- [ ] **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (`configs/miniimagenet_fm_vit.yaml`, 80 epochs).
 
 **End-of-Day-2 checkpoint:** all code implemented; all MNIST runs complete; both 80-epoch MiniImageNet runs in progress. Start drafting writeup sections.
 

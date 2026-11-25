@@ -33,8 +33,17 @@ Our convolutional backbone follows the modern diffusion U-Net design (Rombach et
 Our Vision Transformer adapts the Diffusion Transformer (DiT) architecture (Peebles & Xie, ICCV 2023):
 
 - **Patchification & Positional Encoding:** The input image/latent $x \in \mathbb{R}^{B \times C \times H \times W}$ is partitioned into non-overlapping patches of size $p \times p$ (default $p=2$) via convolutional projection `x_embedder`, producing a sequence of tokens $Z \in \mathbb{R}^{B \times T \times D}$ where $T = (H/p)(W/p)$. Standard 2D learnable positional embeddings `pos_embed` are added directly.
-- **adaLN-Zero Conditioning:** Rather than concatenating tokens, time embedding $t$ and label embedding $y$ are summed ($c_{\text{cond}} = t + y$) and fed into an adaptive layer normalization (adaLN-Zero) modulation mechanism. For each DiT block, $c_{\text{cond}}$ regresses six modulation parameters: scale and shift $(\gamma_1, \beta_1)$ and gate $\alpha_1$ for self-attention, plus $(\gamma_2, \beta_2)$ and gate $\alpha_2$ for the MLP. Crucially, the gate parameters are initialized to zero, ensuring that each block starts as an identity function during training initialization.
-- **Decoder & Output Head:** After $L$ DiT blocks, an adaptive layer norm modulates the sequence using scale/shift from $c_{\text{cond}}$, followed by a linear projection back to patch pixels ($D \to p^2 \cdot C$) and unpatchification into spatial dimension $(B, C, H, W)$.
+- **adaLN-Zero Conditioning:** Rather than concatenating tokens, time embedding $t$ and label embedding $y$ are summed ($c_{\text{cond}} = t + y \in \mathbb{R}^{N \times D}$) and fed into an adaptive layer normalization (adaLN-Zero) modulation mechanism. For each DiT block, $c_{\text{cond}}$ regresses six modulation parameters: scale and shift $(\gamma_1, \beta_1)$ and gate $\alpha_1$ for self-attention, plus $(\gamma_2, \beta_2)$ and gate $\alpha_2$ for the MLP. Crucially, the gate parameters are initialized to zero, ensuring that each block starts as an identity function during training initialization.
+- **Forward Pass Implementation:**
+  ```python
+  c = t + y
+  for block in self.blocks:
+      x = block(x, c)
+  x = self.final_layer(x, c)
+  x = self.unpatchify(x)
+  return x
+  ```
+  After $L$ DiT blocks, `DiTDecodingLayer` applies adaptive layer norm modulation from $c$, followed by linear projection to $p^2 \cdot C$ channels, and `unpatchify` rearranges the sequence back to spatial dimension $(B, C, H, W)$.
 
 ---
 
@@ -77,8 +86,14 @@ The path derivative gives a constant marginal velocity $u_t(x_t) = \frac{d x_t}{
 The flow matching objective optimizes:
 $$\mathcal{L}_{FM}(\theta) = \mathbb{E}_{t \sim \mathcal{U}[0, 1], z, x_{\text{data}}}\left[\|v_\theta(x_t, c, t) - (x_{\text{data}} - z)\|_2^2\right]$$
 
+In `compute_loss`, we draw continuous time $t \sim \mathcal{U}[0, 1]$ and Gaussian noise $z \sim \mathcal{N}(0, I)$. For latent modeling (`use_vae=True`), input images are first encoded without gradients via `self.vae.encode(x_start)`. The model predicts the trajectory velocity, and regression is performed against target velocity $x_{\text{data}} - z$.
+
 Sampling generates images by numerically solving the Ordinary Differential Equation (ODE) $\frac{dy(t)}{dt} = v_\theta(y(t), c, t)$ via forward Euler integration over $N$ uniform steps ($\Delta t = 1.0 / N$):
 $$y(t + \Delta t) \approx y(t) + \Delta t \cdot v_\theta(y(t), c, t)$$
+
+In `generate`, we initialize $y(0) \sim \mathcal{N}(0, I)$ and step from $t=0$ to $t=1$. For Classifier-Free Guidance (CFG), when $t \ge t_{\text{start}}$, we extrapolate the conditional and unconditional velocities:
+$$v = v_{\text{uncond}} + s \cdot (v_{\text{cond}} - v_{\text{uncond}})$$
+where unconditional evaluation passes $c = \text{num\_classes}$. When `use_vae=True`, generated latents are passed through `self.vae.decode` to produce the final pixel images before clamping to $[0, 1]$.
 
 ### 3.3 MNIST Experiments: DDPM vs. Flow Matching Comparison
 
