@@ -47,3 +47,8 @@ results/**/epoch_*.pth.tar
 # Temporary submission artifacts
 temp_submission/
 reproduced/
+chtc_logs/
+hw3_code.tar.gz
+chtc_fetched/
+chtc/transfer_to_chtc.sh
+chtc/fetch_results.sh

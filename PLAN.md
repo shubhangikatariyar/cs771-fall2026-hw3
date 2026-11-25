@@ -67,18 +67,25 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 **Status: COMPLETED (Verified via unit test suite)**
 - [x] **All:** Set up environment (`pip install -r requirements.txt`), verify PyTorch and CUDA/MPS/CPU execution.
 - [x] **All:** Verify pretrained autoencoder checkpoints in `pretrained/` (`taesd_encoder.pth`, `taesd_decoder.pth`).
+- [x] **Ashvin:** Implemented `UNet.forward` decoder in `libs/unet.py` (reverse pass with skip concatenation).
+- [x] **Ashvin:** Implemented `compute_loss`, `p_sample`, and `generate` in `libs/ddpm.py`.
 - [x] **Shubhangi:** Implemented `LightningDiT.forward` in `libs/vit.py` (2D pos embeddings, DiT adaLN-Zero blocks, final norm, unpatchify).
 - [x] **Shubhangi:** Implemented `compute_loss` and `generate` (Euler ODE with CFG) in `libs/fm.py`.
-- [x] **Shubhangi & Akshat:** Added TAESD encoding/decoding hooks for `use_vae` in `libs/fm.py`.
-- [x] **Verification:** Comprehensive unit test suite verified: all tests pass (ViT forward, FM loss, FM Euler generation, Latent FM with TAESD, and CFG generation).
+- [x] **Akshat & Shubhangi:** Added TAESD encoding/decoding hooks for `use_vae` across `libs/ddpm.py` and `libs/fm.py`.
+- [x] **Verification:** Comprehensive unit test suite verified: all 7 test cases passed (UNet, ViT, DDPM, FM, Latent FM with TAESD, and CFG generation).
 
 ---
 
 ## DAY 2 — MNIST verification + launch overnight MiniImageNet
 
 **Status: IN PROGRESS**
-- [x] **Shubhangi:** Completed `mnist_fm_vit.yaml` (30 epochs, 28,125 iters, loss 0.159, deliverables staged in `results/mnist_fm_vit_20261125_153641/`).
-- [ ] **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (`configs/miniimagenet_fm_vit.yaml`, 80 epochs).
+- [x] **Ashvin:** Completed MNIST DDPM with U-Net (`results/mnist_ddpm_unet_20261123_195358/`, 30 epochs, final loss ~0.030, `model_final.pth.tar` and sample grids saved).
+- [x] **Shubhangi:** Completed MNIST FM with ViT (`results/mnist_fm_vit_20261125_153641/`, 30 epochs, 28,125 iters, loss 0.159, deliverables staged).
+- [ ] **Ashvin:** Launch `mnist_ddpm_vit` (30 epochs, 500 steps).
+- [ ] **Akshat:** Launch `mnist_fm_unet` (30 epochs, 10 steps).
+- [ ] **Overnight Launches (CRITICAL COMPUTE WINDOW):**
+  - **Akshat:** Launch full MiniImageNet Latent FM with U-Net (80 epochs).
+  - **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (80 epochs, in progress).
 
 **End-of-Day-2 checkpoint:** all code implemented; all MNIST runs complete; both 80-epoch MiniImageNet runs in progress. Start drafting writeup sections.
 

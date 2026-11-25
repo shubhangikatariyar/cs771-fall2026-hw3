@@ -230,15 +230,15 @@ class UNet(nn.Module):
         x = self.mid_attn(x, c)
         x = self.mid_res_block2(x, t)
 
-        """
-        Fill in the missing code here (decoder part of UNet).
-        The decoder is similar to the encoder. It applies the following operations
-        within a single block
-        (1) a residual module
-        (2) a transformer module
-        (3) an upsampling module (if there is one)
-        You can use the encoder part as a reference.
-        """
+        # decoder: mirror of the encoder, consuming cached encoder features in
+        # reverse order as skip connections (concatenated along channels)
+        for resblock, transformer, upsample in self.decoder:
+            x = torch.cat([x, encoder_output.pop()], dim=1)
+            x = resblock(x, t)
+            if transformer:
+                x = transformer(x, c)
+            if upsample:
+                x = upsample(x)
 
         x = self.final_layer(x)
         return x
