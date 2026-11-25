@@ -195,8 +195,17 @@ class LightningDiT(nn.Module):
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         
-        """
-        Fill in the missing code here. See details in DiT paper.
-        """
+        # combine conditioning: time embedding + label embedding (N, D)
+        c = t + y
+
+        # pass through DiT transformer blocks with adaLN modulation
+        for block in self.blocks:
+            x = block(x, c)
+
+        # final adaptive layer norm and linear projection
+        x = self.final_layer(x, c)
+
+        # unpatchify from (N, T, patch_size**2 * out_channels) to (N, out_channels, H, W)
+        x = self.unpatchify(x)
 
         return x
