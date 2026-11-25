@@ -82,11 +82,20 @@ class FM(nn.Module):
         Compute the rectified flow loss for training the model.
         Note: t in the range of [0, 1]
         """
+        if self.use_vae:
+            with torch.no_grad():
+                x_start = self.vae.encode(x_start)
 
-        """
-        Fill in the missing code here. See Rectified Flow paper.
-        """
+        t = torch.rand(x_start.shape[0], device=x_start.device, dtype=x_start.dtype)
+        if noise is None:
+            noise = torch.randn_like(x_start)
 
+        t_expand = t.view(-1, *([1] * (x_start.ndim - 1)))
+        x_t = (1.0 - t_expand) * noise + t_expand * x_start
+        target_velocity = x_start - noise
+
+        predicted_velocity = self.model(x_t, label, t)
+        loss = F.mse_loss(predicted_velocity, target_velocity)
         return loss
 
     @torch.no_grad()
@@ -100,6 +109,8 @@ class FM(nn.Module):
         """
         device = next(self.model.parameters()).device
         labels = labels.to(device=device, dtype=torch.long)
+        if cfg:
+            validate_guidance(self.model, cfg_scale, cfg_start_t)
         if cfg_method not in ("cfg", "cfg++"):
             raise ValueError("cfg_method must be 'cfg' or 'cfg++'")
         # shape of the results
@@ -107,9 +118,26 @@ class FM(nn.Module):
         # start from pure noise (for each example in the batch)
         imgs = torch.randn(shape, device=device)
 
-        """
-        Fill in the missing code here. See Rectified Flow paper.
-        """
+        dt = self.dt
+        for i in range(self.timesteps):
+            t_val = i * dt
+            t = torch.full((len(labels),), t_val, device=device, dtype=imgs.dtype)
+
+            if cfg and (t_val >= cfg_start_t) and (cfg_scale != 1.0):
+                uncond_labels = torch.full_like(labels, self.num_classes)
+                v_cond = self.model(imgs, labels, t)
+                v_uncond = self.model(imgs, uncond_labels, t)
+                if cfg_method == "cfg":
+                    v = v_uncond + cfg_scale * (v_cond - v_uncond)
+                else:
+                    v = v_cond + (cfg_scale - 1.0) * (v_cond - v_uncond)
+            else:
+                v = self.model(imgs, labels, t)
+
+            imgs = imgs + dt * v
+
+        if self.use_vae:
+            imgs = self.vae.decode(imgs)
 
         # postprocessing the images
         imgs = self.postprocess(imgs)

@@ -172,6 +172,10 @@ class DDPM(nn.Module):
         Compute the simplified loss for training the model.
         Algorithm 1 line 5 in the paper.
         """
+        if self.use_vae:
+            with torch.no_grad():
+                x_start = self.vae.encode(x_start)
+
         # t ~ Uniform{0, ..., T-1}, one per example
         t = torch.randint(
             0, self.timesteps, (x_start.shape[0],), device=x_start.device
@@ -246,6 +250,9 @@ class DDPM(nn.Module):
             t = torch.full((len(labels),), i, device=device, dtype=torch.long)
             imgs = self.p_sample(imgs, labels, t, i)
         
+        if self.use_vae:
+            imgs = self.vae.decode(imgs)
+
         # postprocessing the images
         imgs = self.postprocess(imgs)
         return imgs
