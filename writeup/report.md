@@ -9,7 +9,7 @@
 
 ## 1. Prediction Networks: U-Net and Vision Transformer (2 points)
 
-Both generative modeling frameworks—Denoising Diffusion Probabilistic Models (DDPM) and Flow Matching (FM)—rely fundamentally on an underlying parameteric neural network $f_\theta(x, c, t)$ that predicts a vector field conditioned on an image/latent representation $x$, a categorical class label $c \in \{0, \dots, C-1\}$, and a continuous or discrete time variable $t$. While DDPM employs $f_\theta$ to predict the injected Gaussian noise $\epsilon$, Flow Matching uses $f_\theta$ to estimate the instantaneous velocity along a straight probability trajectory. We implement, analyze, and benchmark two contrasting prediction architectures: a convolutional U-Net with spatial cross-attention and a Vision Transformer (LightningDiT) with adaptive layer normalization.
+Both generative modeling frameworks—Denoising Diffusion Probabilistic Models (DDPM) and Flow Matching (FM)—rely fundamentally on an underlying parametric neural network $f_\theta(x, c, t)$ that predicts a vector field conditioned on an image/latent representation $x$, a categorical class label $c \in \{0, \dots, C-1\}$, and a continuous or discrete time variable $t$. While DDPM employs $f_\theta$ to predict the injected Gaussian noise $\epsilon$, Flow Matching uses $f_\theta$ to estimate the instantaneous velocity along a straight probability trajectory. We implement, analyze, and benchmark two contrasting prediction architectures: a convolutional U-Net with spatial cross-attention and a Vision Transformer (LightningDiT) with adaptive layer normalization.
 
 ### 1.1 U-Net Decoder (`libs/unet.py`)
 
@@ -166,7 +166,7 @@ With the same backbone, each network call costs about the same for both methods,
 - **Cost:** FM gets this quality with 10 network evaluations instead of 500.
 - **Limits:** this is a visual comparison of one run per method, with no FID. The two runs were trained on different machines, so we don't compare their training times.
 
-> **Still missing:** the U-Net comparison needs the `mnist_fm_unet` results (Akshat) in `results/`. Ashvin then compares them with the DDPM U-Net grid in Section 2.4.
+**Pending in this version:** the MNIST flow matching run with the U-Net is not finished. The U-Net vs. ViT comparison for flow matching, and the DDPM vs. flow matching comparison with the U-Net, will be added in an updated submission.
 
 ---
 
@@ -179,23 +179,12 @@ Operating directly in pixel space on higher-resolution datasets ($128 \times 128
 
 ### 4.2 MiniImageNet Latent FM Results
 
-**Status:** the ViT run is complete. The U-Net run and the FID scores are not in the repo yet.
+At the time of this submission the ViT run is complete. The U-Net run and the FID scores for both backbones are still pending and will be added in an updated submission.
 
 | Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
-| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | not available |
-
-Still to be added:
-
-| What | Who |
-|---|---|
-| U-Net run: loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`, training time and GPU | Akshat |
-| FID for both final EMA checkpoints from `eval.py` (5,000 images each), with the `eval.py` output saved | Akshat |
-| Training curves and sample grids in this section | each run's owner |
-| Comparison of the two backbones in quality and compute cost | Akshat (U-Net), with the ViT results below |
-
-For the baseline FID, `test_cfg.cfg` has to be set to `False`, because the code defaults turn guidance on (scale 2.5).
+| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | pending | pending |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | pending |
 
 **ViT run.** Trained for 80 epochs (62,500 logged iterations, batch size 64, Adam, learning rate $2 \times 10^{-4}$ with 1 epoch of warmup, EMA decay 0.9996) on CHTC. Wall time is about 79 minutes including the periodic sampling. We set `TORCH_COMPILE_DISABLE=1`, because the autoencoder's `torch.compile` call needs a C compiler that the training container did not have. Files are in `results/miniimagenet_fm_vit_20261126_022239/`.
 
@@ -219,7 +208,6 @@ The loss drops quickly in the first few epochs and then goes down very slowly, w
 
 At epoch 5 the samples are only blurry color patches. By epoch 80 they have realistic colors and textures, and many have a clear foreground against a background. Most objects are still not recognizable, shapes are often distorted, and from this grid it is hard to tell that samples in one column share a class. The loss changes little late in training even though the samples keep sharpening, so the loss alone is not a good measure of quality. FID is still needed to put a number on it.
 
-
 ---
 
 ## 5. Bonus: Classifier-Free Guidance (CFG) (+2 points)
@@ -231,15 +219,7 @@ where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unco
 
 ### 5.2 Qualitative & Quantitative Evaluation
 
-**Status: no guidance results are in the repo yet.** Guidance is implemented for flow matching (`libs/fm.py`), but there are no measurements to report.
-
-| What needs to be added (Akshat) | Details |
-|---|---|
-| Baseline FID | same checkpoints, `test_cfg.cfg: False` |
-| Guided FID | `test_cfg.cfg: True`, at each scale tested (for example 2.0, 2.5, 3.5), with `cfg_start_t` stated |
-| Sample grids | side by side, with and without guidance, same classes |
-| Discussion | image quality, match to the requested class, and diversity |
-| Files | configs and `eval.py` output in `results/` |
+Guidance is implemented for flow matching (`libs/fm.py`), but we have not evaluated it yet, so no FID values or sample comparisons are reported in this version.
 
 ---
 
