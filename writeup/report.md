@@ -145,7 +145,7 @@ In `libs/fm.py`:
 | Sampler | stochastic, fresh noise at each step | deterministic Euler ODE |
 | Network evaluations per sample batch | 500 | 10 |
 
-With the same backbone, each network call costs about the same for both methods, so flow matching should sample roughly 50 times faster. This follows from the step counts; we have not timed it separately. The training losses of the two methods have different targets, so their values can't be compared directly.
+With the same backbone, each network call costs about the same for both methods, so flow matching should sample roughly 50 times faster. We measured this at the end of this section. The training losses of the two methods have different targets, so their values can't be compared directly.
 
 **Training Convergence & Qualitative Evaluation (ViT + Flow Matching):**
 - **Architecture:** LightningDiT (depth 8, hidden dimension 192, 4 heads, patch size 2, total ~44MB weights).
@@ -166,7 +166,44 @@ With the same backbone, each network call costs about the same for both methods,
 - **Cost:** FM gets this quality with 10 network evaluations instead of 500.
 - **Limits:** this is a visual comparison of one run per method, with no FID. The two runs were trained on different machines, so we don't compare their training times.
 
-**Pending in this version:** the MNIST flow matching run with the U-Net is not finished. The U-Net vs. ViT comparison for flow matching, and the DDPM vs. flow matching comparison with the U-Net, will be added in an updated submission.
+**U-Net backbone.** The U-Net FM run used the same settings (30 epochs, 28,140 iterations, batch size 64, learning rate $10^{-4}$, EMA decay 0.9996) on one NVIDIA L4 (GCP), and took 67 minutes including the periodic sampling. The last logged loss is 0.163, with a running average of 0.165. Files are in `results/mnist_fm_unet_gcp/`.
+
+![FM training loss on MNIST](figures/fm_mnist_loss.png)
+
+*Figure: flow matching loss on MNIST for both backbones. Faint lines are the values logged every 100 iterations; solid lines average the last 5 of them.*
+
+| | U-Net | ViT |
+|---|:---:|:---:|
+| Parameters | 7.46M | 5.50M |
+| Last logged loss | 0.163 | 0.159 |
+| Running average at the end | 0.165 | 0.177 |
+
+**FM: U-Net vs. ViT.** The U-Net loss drops faster in the first few epochs. After about epoch 8 the two curves overlap and end at nearly the same value. The ViT's higher running average comes from its slower start, not from a worse final model.
+
+| FM U-Net, epoch 30 | FM ViT, epoch 30 |
+|:---:|:---:|
+| ![FM U-Net samples](figures/fm_unet_samples.png) | ![FM ViT samples](figures/fm_vit_samples.png) |
+
+*Each column is one class, 0 to 9.*
+
+Both grids show clear, class-correct digits. The U-Net's digits are a bit thicker and more uniform. The ViT's vary more in stroke and slant, and it has slightly more broken shapes. As with DDPM, the U-Net has about 1.36 times as many parameters, so the comparison is not size-matched.
+
+**U-Net backbone: DDPM vs. FM.**
+
+| DDPM U-Net, epoch 30 (500 steps) | FM U-Net, epoch 30 (10 steps) |
+|:---:|:---:|
+| ![DDPM U-Net samples](figures/ddpm_unet_samples.png) | ![FM U-Net samples](figures/fm_unet_samples.png) |
+
+The two grids are of similar quality. Each has a few malformed or wrong-class digits (for example in the first row of the DDPM grid, and among the 7s and 8s of the FM grid). Neither is clearly better by eye.
+
+**Measured sampling time.** We timed one batch of 100 images (10 per class) with each final MNIST model, on the same machine (Apple M4 GPU, PyTorch MPS backend), after a warm-up. Results are in `results/sampling_time.txt`.
+
+| Backbone | DDPM (500 steps) | FM (10 steps) | Speed-up |
+|---|:---:|:---:|:---:|
+| U-Net | 169.9 s | 3.7 s | 46× |
+| ViT | 243.8 s | 5.2 s | 47× |
+
+The speed-up is close to the 50× expected from the step counts. It is a little lower because each call also has fixed per-step costs. On this machine the ViT is about 1.4 times slower per step than the U-Net, even though it has fewer parameters: it runs attention over 196 tokens in every one of its 8 blocks, while most of the U-Net's work is convolutions. For MiniImageNet, the U-Net FM model takes 1.9 s per 100 images without guidance and 3.1 s with guidance (scale 2.5), on the same machine.
 
 ---
 
@@ -176,15 +213,15 @@ With the same backbone, each network call costs about the same for both methods,
 Operating directly in pixel space on higher-resolution datasets ($128 \times 128$ RGB) imposes steep computational and memory overheads. We leverage a pretrained Tiny AutoEncoder for Stable Diffusion (**TAESD**):
 - **Compression:** Compresses $3 \times 128 \times 128$ images into $4 \times 16 \times 16$ latent representations (8× spatial downsampling on each side and $48\times$ fewer values).
 - **Integration:** In `compute_loss`, images are encoded without gradients: $z_0 = \text{self.vae.encode}(x_{\text{data}})$. Flow matching operates entirely in latent space. During `generate`, sampled latents $z_1$ are decoded back to pixel space via $\hat{x} = \text{self.vae.decode}(z_1)$ and clipped to $[0, 1]$.
+- **DDPM:** `libs/ddpm.py` uses the same two hooks. `compute_loss` encodes the clean images before `q_sample` adds noise, and `generate` runs all reverse steps on latents and decodes the result at the end. In both models the constructor sets the network's input shape to the latent shape ($4 \times 16 \times 16$) instead of the image shape, and freezes the autoencoder.
+- **How this differs from pixel space:** the network never sees pixels. It models a distribution over latents, and the frozen decoder turns samples back into images, so the decoder's quality limits how sharp samples can be. With `use_vae` on, the data loader gives images in $[0, 1]$ (the range TAESD expects) instead of $[-1, 1]$.
 
 ### 4.2 MiniImageNet Latent FM Results
 
-At the time of this submission the ViT run and its FID evaluation are complete. The U-Net run and its FID score are still pending and will be added in an updated submission.
-
-| Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | pending | pending |
-| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | **116.02** (no guidance) |
+| Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | Final loss (running avg.) | FID, no guidance (lower is better) |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | ~124 min (NVIDIA L4) | 0.850 (0.892) | 118.83 |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | 0.858 (0.886) | **116.02** |
 
 **ViT run.** Trained for 80 epochs (62,500 logged iterations, batch size 64, Adam, learning rate $2 \times 10^{-4}$ with 1 epoch of warmup, EMA decay 0.9996) on CHTC. Wall time is about 79 minutes including the periodic sampling. We set `TORCH_COMPILE_DISABLE=1`, because the autoencoder's `torch.compile` call needs a C compiler that the training container did not have. Files are in `results/miniimagenet_fm_vit_20261126_022239/`.
 
@@ -208,7 +245,38 @@ The loss drops quickly in the first few epochs and then goes down very slowly, w
 
 At epoch 5 the samples are only blurry color patches. By epoch 80 they have realistic colors and textures, and many have a clear foreground against a background. Most objects are still not recognizable, shapes are often distorted, and from this grid it is hard to tell that samples in one column share a class. The loss changes little late in training even though the samples keep sharpening, so the loss alone is not a good measure of quality. Without guidance, the final EMA model has an FID of 116.02.
 
-**FID setup.** We used `eval.py` with 50 generated images per class (5,000 in total) and 10 Euler steps, compared against the 5,000 MiniImageNet test images. Guidance was turned off for this baseline (`test_cfg.cfg: False`). Sampling ran on an Apple M4 GPU and `eval.py` computes the Inception features on the CPU. Each score comes from a single run. Configs and logs are in `results/fid_miniimagenet_fm_vit/`.
+**U-Net run.** Same settings as the ViT run (80 epochs, 62,500 iterations, batch size 64, learning rate $2 \times 10^{-4}$, EMA decay 0.9996), trained on one NVIDIA L4 GPU on Google Cloud. Wall time was about 124 minutes including the periodic sampling. Unlike the CHTC run, the autoencoder's `torch.compile` was left on. Files are in `results/miniimagenet_fm_unet_gcp/`.
+
+![MiniImageNet loss, both backbones](figures/mini_fm_loss.png)
+
+*Figure: latent FM loss on MiniImageNet for both backbones. Faint lines are the values logged every 100 iterations; solid lines average the last 20 of them.*
+
+| Around epoch | 1 | 10 | 20 | 40 | 80 |
+|---|:---:|:---:|:---:|:---:|:---:|
+| U-Net, mean logged loss nearby | 0.985 | 0.911 | 0.895 | 0.891 | 0.871 |
+| ViT, mean logged loss nearby | 0.998 | 0.900 | 0.891 | 0.873 | 0.863 |
+
+The two loss curves are close for the whole run. From about epoch 20 the ViT is slightly lower, by about 0.01.
+
+*U-Net, epoch 4:*
+
+![U-Net samples at epoch 4](figures/mini_unet_samples_epoch4.png)
+
+*U-Net, epoch 80:*
+
+![U-Net samples at epoch 80](figures/mini_unet_samples.png)
+
+*EMA samples with 10 Euler steps. Columns are the first 10 of the 100 classes. Early grids were saved every 2 epochs for this run, so the closest early grid is from epoch 4.*
+
+At epoch 4 the U-Net samples look like a collage of small sharp fragments rather than the ViT's blurry color patches. By epoch 80 they look much like the ViT's: realistic colors and textures, some birds and animals that can be recognized (for example in the first two columns), but most objects are distorted. The final U-Net FID without guidance is 118.83.
+
+**U-Net vs. ViT on MiniImageNet.**
+
+- **Quality:** the ViT is slightly better on FID (116.0 vs. 118.8 without guidance), and stays ahead at every guidance scale (Section 5). A gap of about 3 FID from one run each with 5,000 samples is small, so we read this as "similar, with a slight edge to the ViT". This is the reverse of MNIST, where the U-Net looked slightly better. One possible reason, which we did not test: on $4 \times 16 \times 16$ latents a patch size of 2 gives only 64 tokens, so the ViT's global attention is cheap, and the U-Net's local convolutional prior may help less because each latent position already summarizes an $8 \times 8$ pixel patch.
+- **Size:** the two models are close (16.77M vs. 18.35M parameters).
+- **Compute:** the runs used different GPUs, so wall times cannot be compared directly. Per training iteration the U-Net took about 0.12 s on the L4 and the ViT about 0.08 s on the L40S, which is a faster GPU. For sampling, the U-Net takes 1.9 s per 100 images on an Apple M4 (Section 3.3). We did not time the MiniImageNet ViT, because its checkpoint was not on that machine.
+
+**FID setup.** We used `eval.py` with 50 generated images per class (5,000 in total) and 10 Euler steps, compared against the 5,000 MiniImageNet test images. Guidance was turned off for this baseline (`test_cfg.cfg: False`). For the ViT, sampling ran on an Apple M4 GPU and `eval.py` computed the Inception features on the CPU. For the U-Net, everything ran on the L4 GPU used for training. Each score comes from a single run. Configs and logs are in `results/fid_miniimagenet_fm_vit/` and `results/miniimagenet_fm_unet_gcp/eval_results/`, and the U-Net eval configs are in `code/configs/eval/`.
 
 ---
 
@@ -221,16 +289,20 @@ where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unco
 
 ### 5.2 Qualitative & Quantitative Evaluation
 
-We evaluated guidance on the ViT checkpoint from Section 4.2, with no retraining. All settings use the FID setup described there. Guidance is applied for $t \ge 0.1$, which is 9 of the 10 Euler steps.
+We evaluated guidance on both checkpoints from Section 4.2, with no retraining. All settings use the FID setup described there. Guidance is applied for $t \ge 0.1$, which is 9 of the 10 Euler steps.
 
-| Guidance scale $s$ | FID (lower is better) | Change from baseline | Network evaluations per image |
-|:---:|:---:|:---:|:---:|
-| 1.0 (no guidance, baseline) | 116.02 | - | 10 |
-| 1.5 | 97.31 | -16% | 19 |
-| 2.5 | 72.59 | -37% | 19 |
-| 4.0 | **57.28** | -51% | 19 |
+| Guidance scale $s$ | ViT FID | ViT change | U-Net FID | U-Net change | Network evaluations per image |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 1.0 (no guidance, baseline) | 116.02 | - | 118.83 | - | 10 |
+| 1.5 | 97.31 | -16% | 101.35 | -15% | 19 |
+| 2.5 | 72.59 | -37% | 79.88 | -33% | 19 |
+| 4.0 | **57.28** | -51% | **66.54** | -44% | 19 |
 
-The grids below use classes 0 to 9 (one per column) and start from the same noise, so only the guidance scale changes.
+*FID, lower is better.*
+
+Guidance helps both backbones by a similar amount at small scales. At larger scales the ViT gains more, so the gap between them grows from about 3 FID without guidance to about 9 at scale 4.0.
+
+**ViT grids.** The grids below use classes 0 to 9 (one per column) and start from the same noise, so only the guidance scale changes.
 
 *No guidance:*
 
@@ -244,11 +316,27 @@ The grids below use classes 0 to 9 (one per column) and start from the same nois
 
 ![Guidance scale 4.0](figures/cfg_vit_s4.0.png)
 
+**U-Net grids.** Same layout, made the same way (fixed noise, only the scale changes).
+
+*No guidance:*
+
+![U-Net, no guidance](figures/cfg_unet_s1.0.png)
+
+*Scale 2.5:*
+
+![U-Net, guidance scale 2.5](figures/cfg_unet_s2.5.png)
+
+*Scale 4.0:*
+
+![U-Net, guidance scale 4.0](figures/cfg_unet_s4.0.png)
+
+The U-Net grids show the same pattern. Without guidance, few columns look like one class. At scale 4.0 several do: orange-brown birds in the first column, green leaves or lizards in the fourth, toucans in the sixth, and blue underwater scenes in the eighth. The fixed noise keeps each image's layout, and guidance mostly sharpens the object and pushes colors toward the class.
+
 - **Image quality:** guided samples have sharper objects, cleaner backgrounds and stronger colors. Many are still distorted, even at scale 4.0.
 - **Match to the requested class:** this improves the most. Without guidance it is hard to tell that a column shares a class. At scale 4.0 several columns clearly do, for example the red-headed birds in the first column and the toucan-like birds in the sixth.
 - **Diversity:** samples within a column become more alike as the scale grows, with repeated colors, backgrounds and layouts.
 - **Trade-off:** FID improved at every scale we tried and was still falling at 4.0, so we have not found the best scale. Larger values may lose too much diversity. The cost is almost twice as many network evaluations; on the M4 GPU, generation speed at scale 2.5 dropped from about 35 to 19 images per second.
-- **Limits:** one backbone, one random run per setting, and 5,000 samples, so small FID differences should not be over-read. The U-Net has not been evaluated.
+- **Limits:** one random run per setting and 5,000 samples, so small FID differences should not be over-read.
 
 ---
 
@@ -259,6 +347,7 @@ The grids below use classes 0 to 9 (one per column) and start from the same nois
 - **Shubhangi Katariyar:**
   - Implemented `LightningDiT.forward` in `libs/vit.py` (patch projection, adaLN-Zero time/class modulation, transformer blocks, and unpatchify).
   - Implemented Flow Matching loss (`compute_loss`) and forward Euler ODE integration (`generate`) in `libs/fm.py`.
+  - Implemented the TAESD latent hooks (`use_vae`) in `libs/ddpm.py` and `libs/fm.py`, and classifier-free guidance sampling in `libs/fm.py`.
   - Executed and validated full 30-epoch MNIST FM (ViT) training (loss $0.159$).
   - Authored writeup sections on Vision Transformer architecture and Flow Matching derivation.
 - **Ashvin Sehgal:**
@@ -267,9 +356,10 @@ The grids below use classes 0 to 9 (one per column) and start from the same nois
   - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$), the 80-epoch MiniImageNet latent FM run with ViT, and its FID and guidance scale evaluation.
   - Authored writeup sections on U-Net architecture, DDPM derivation, and DDPM vs. FM comparative analysis.
 - **Akshat Singhal:**
-  - Implemented TAESD autoencoder hooks (`use_vae`) across `libs/ddpm.py` and `libs/fm.py`.
-  - Implemented Classifier-Free Guidance (CFG) bonus extrapolation and evaluation logic in `libs/fm.py`.
-  - Coordinated repository CI/CD branching rules and code reviews.
+  - Set up Google Cloud training (L4 GPU VM, resumable training scripts in `gcp/`) and ran the 30-epoch MNIST FM run with the U-Net (loss $0.163$) and the 80-epoch MiniImageNet latent FM run with the U-Net (loss $0.850$).
+  - Ran the U-Net FID evaluation without guidance and at guidance scales 1.5, 2.5 and 4.0 (eval configs in `code/configs/eval/`).
+  - Made the U-Net figures (`writeup/make_unet_figures.py`: loss curves, sample and guidance grids, sampling-time measurement) and wrote the U-Net results, backbone comparisons and guidance comparison in Sections 3.3, 4 and 5.
+  - Coordinated repository branching rules and code reviews.
 
 ### Additional Packages
 All implementations were built using standard open-source scientific Python packages without proprietary extensions:

@@ -1,0 +1,25 @@
+output_folder: "../logs"
+model_type: "FM"
+dataset:
+  name: "MiniImageNet"
+  data_folder: "../data/"
+model:
+  arch_type: "ViT"
+  arch_cfg:
+    depth: 12
+    hidden_size: 288
+  use_vae: True
+  vae_encoder_weights: "../pretrained/taesd_encoder.pth"
+  vae_decoder_weights: "../pretrained/taesd_decoder.pth"
+  timesteps: 10
+loader:
+  batch_size: 64
+  num_workers: 4
+train_cfg:
+  lr: 0.0002
+  epochs: 80
+  warmup_epochs: 1
+  num_eval_viz_samples: 5
+test_cfg:
+  num_eval_samples: 50
+  cfg: False
