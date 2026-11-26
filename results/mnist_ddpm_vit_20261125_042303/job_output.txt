@@ -1,0 +1,399 @@
++ hostname
+asehgal9-12667400.0-hsharma-chtcgpu4000.chtc.wisc.edu
++ nvidia-smi
+Wed Nov 25 04:22:44 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H200                    On  |   00000000:5D:00.0 Off |                    0 |
+| N/A   35C    P0             77W /  700W |       4MiB / 143771MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
++ python3 --version
+Python 3.11.9
++ tar xzf hw3_code.tar.gz
++ pip install --quiet -r code/requirements.txt
+  WARNING: The scripts f2py and numpy-config are installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script markdown_py is installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script idna is installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script tensorboard is installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script httpx2 is installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The scripts hf and tiny-agents are installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script datasets-cli is installed in '/home/asehgal9/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
++ cd code
++ python train.py ./configs/mnist_ddpm_vit.yaml
+Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz to ../data/MNIST/raw/train-images-idx3-ubyte.gz
+  0%|          | 0/9912422 [00:00<?, ?it/s]  8%|▊         | 753664/9912422 [00:00<00:01, 6765320.34it/s]100%|██████████| 9912422/9912422 [00:00<00:00, 52901633.59it/s]
+Extracting ../data/MNIST/raw/train-images-idx3-ubyte.gz to ../data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-labels-idx1-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-labels-idx1-ubyte.gz to ../data/MNIST/raw/train-labels-idx1-ubyte.gz
+  0%|          | 0/28881 [00:00<?, ?it/s]100%|██████████| 28881/28881 [00:00<00:00, 1509403.82it/s]
+Extracting ../data/MNIST/raw/train-labels-idx1-ubyte.gz to ../data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz to ../data/MNIST/raw/t10k-images-idx3-ubyte.gz
+  0%|          | 0/1648877 [00:00<?, ?it/s] 48%|████▊     | 786432/1648877 [00:00<00:00, 7022507.30it/s]100%|██████████| 1648877/1648877 [00:00<00:00, 12191576.81it/s]
+Extracting ../data/MNIST/raw/t10k-images-idx3-ubyte.gz to ../data/MNIST/raw
+
+Downloading http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz
+Failed to download (trying next):
+HTTP Error 404: Not Found
+
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz
+Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz to ../data/MNIST/raw/t10k-labels-idx1-ubyte.gz
+  0%|          | 0/4542 [00:00<?, ?it/s]100%|██████████| 4542/4542 [00:00<00:00, 10203818.30it/s]
+Extracting ../data/MNIST/raw/t10k-labels-idx1-ubyte.gz to ../data/MNIST/raw
+
+{'dataset': {'data_folder': '../data',
+             'name': 'MNIST',
+             'test_split': 'test',
+             'train_split': 'train'},
+ 'devices': ['cuda:0'],
+ 'dtype': 'fp32',
+ 'loader': {'batch_size': 64, 'num_workers': 4},
+ 'model': {'arch_cfg': {'class_dropout_prob': 0.1,
+                        'depth': 8,
+                        'hidden_size': 192,
+                        'mlp_ratio': 4.0,
+                        'num_heads': 4,
+                        'patch_size': 2},
+           'arch_type': 'ViT',
+           'img_shape': [1, 28, 28],
+           'num_classes': 10,
+           'timesteps': 500,
+           'use_vae': False,
+           'vae_decoder_weights': None,
+           'vae_encoder_weights': None},
+ 'model_type': 'DDPM',
+ 'output_folder': '../logs',
+ 'test_cfg': {'cfg': True,
+              'cfg_scale': 2.5,
+              'cfg_start_t': 0.1,
+              'fid_stats_path': None,
+              'num_eval_samples': 100,
+              'sample_batch_size': 50,
+              'test_data_folder': None},
+ 'train_cfg': {'ema_decay': 0.9996,
+               'epochs': 30,
+               'lr': 0.0001,
+               'num_eval_viz_samples': 10,
+               'viz_batch_size': 20,
+               'warmup_epochs': 1}}
+
+Start training ...
+Iter 00000100	Time 0.03 (0.03)	LR 0.00010	Loss 0.198 (0.198)
+Iter 00000200	Time 0.03 (0.03)	LR 0.00010	Loss 0.085 (0.142)
+Iter 00000300	Time 0.03 (0.03)	LR 0.00010	Loss 0.084 (0.122)
+Iter 00000400	Time 0.03 (0.03)	LR 0.00010	Loss 0.065 (0.108)
+Iter 00000500	Time 0.03 (0.03)	LR 0.00010	Loss 0.065 (0.099)
+Iter 00000600	Time 0.03 (0.03)	LR 0.00010	Loss 0.065 (0.094)
+Iter 00000700	Time 0.03 (0.03)	LR 0.00010	Loss 0.050 (0.087)
+Iter 00000800	Time 0.03 (0.03)	LR 0.00010	Loss 0.052 (0.083)
+Iter 00000900	Time 0.03 (0.03)	LR 0.00010	Loss 0.056 (0.080)
+Iter 00001000	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.076)
+Iter 00001100	Time 0.03 (0.03)	LR 0.00010	Loss 0.054 (0.074)
+Iter 00001200	Time 0.03 (0.03)	LR 0.00010	Loss 0.051 (0.072)
+Iter 00001300	Time 0.03 (0.03)	LR 0.00010	Loss 0.047 (0.070)
+Iter 00001400	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.068)
+Iter 00001500	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.066)
+Iter 00001600	Time 0.03 (0.03)	LR 0.00010	Loss 0.050 (0.065)
+Iter 00001700	Time 0.03 (0.03)	LR 0.00010	Loss 0.042 (0.064)
+Iter 00001800	Time 0.03 (0.03)	LR 0.00010	Loss 0.046 (0.063)
+Iter 00001900	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.062)
+Iter 00002000	Time 0.03 (0.03)	LR 0.00010	Loss 0.051 (0.061)
+Iter 00002100	Time 0.03 (0.03)	LR 0.00010	Loss 0.044 (0.060)
+Iter 00002200	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.059)
+Iter 00002300	Time 0.03 (0.03)	LR 0.00010	Loss 0.034 (0.058)
+Iter 00002400	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.058)
+Iter 00002500	Time 0.03 (0.03)	LR 0.00010	Loss 0.052 (0.057)
+Iter 00002600	Time 0.03 (0.03)	LR 0.00010	Loss 0.035 (0.056)
+Iter 00002700	Time 0.03 (0.03)	LR 0.00010	Loss 0.045 (0.056)
+Iter 00002800	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.056)
+Iter 00002900	Time 0.03 (0.03)	LR 0.00010	Loss 0.041 (0.055)
+Iter 00003000	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.054)
+Iter 00003100	Time 0.03 (0.03)	LR 0.00010	Loss 0.037 (0.054)
+Iter 00003200	Time 0.03 (0.03)	LR 0.00010	Loss 0.041 (0.054)
+Iter 00003300	Time 0.03 (0.03)	LR 0.00010	Loss 0.034 (0.053)
+Iter 00003400	Time 0.03 (0.03)	LR 0.00010	Loss 0.039 (0.053)
+Iter 00003500	Time 0.03 (0.03)	LR 0.00010	Loss 0.042 (0.052)
+Iter 00003600	Time 0.03 (0.03)	LR 0.00010	Loss 0.036 (0.052)
+Iter 00003700	Time 0.03 (0.03)	LR 0.00010	Loss 0.037 (0.051)
+Iter 00003800	Time 0.03 (0.03)	LR 0.00010	Loss 0.046 (0.051)
+Iter 00003900	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.051)
+Iter 00004000	Time 0.03 (0.03)	LR 0.00010	Loss 0.046 (0.051)
+Iter 00004100	Time 0.03 (0.03)	LR 0.00010	Loss 0.034 (0.050)
+Iter 00004200	Time 0.03 (0.03)	LR 0.00010	Loss 0.039 (0.050)
+Iter 00004300	Time 0.03 (0.03)	LR 0.00010	Loss 0.042 (0.050)
+Iter 00004400	Time 0.03 (0.03)	LR 0.00010	Loss 0.048 (0.050)
+Iter 00004500	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.050)
+Iter 00004600	Time 0.03 (0.03)	LR 0.00010	Loss 0.037 (0.049)
+Iter 00004700	Time 0.38 (0.04)	LR 0.00010	Loss 0.034 (0.049)
+Iter 00004800	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.049)
+Iter 00004900	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.048)
+Iter 00005000	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.048)
+Iter 00005100	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.048)
+Iter 00005200	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.048)
+Iter 00005300	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.048)
+Iter 00005400	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.047)
+Iter 00005500	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.047)
+Iter 00005600	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.047)
+Iter 00005700	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.047)
+Iter 00005800	Time 0.03 (0.04)	LR 0.00010	Loss 0.043 (0.047)
+Iter 00005900	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.046)
+Iter 00006000	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.046)
+Iter 00006100	Time 0.03 (0.04)	LR 0.00010	Loss 0.044 (0.046)
+Iter 00006200	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.046)
+Iter 00006300	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.046)
+Iter 00006400	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.046)
+Iter 00006500	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.045)
+Iter 00006600	Time 0.03 (0.04)	LR 0.00010	Loss 0.026 (0.045)
+Iter 00006700	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.045)
+Iter 00006800	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.045)
+Iter 00006900	Time 0.03 (0.04)	LR 0.00010	Loss 0.040 (0.045)
+Iter 00007000	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.045)
+Iter 00007100	Time 0.03 (0.03)	LR 0.00010	Loss 0.044 (0.045)
+Iter 00007200	Time 0.03 (0.03)	LR 0.00010	Loss 0.040 (0.044)
+Iter 00007300	Time 0.03 (0.03)	LR 0.00010	Loss 0.034 (0.044)
+Iter 00007400	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.044)
+Iter 00007500	Time 0.03 (0.03)	LR 0.00010	Loss 0.032 (0.044)
+Iter 00007600	Time 0.03 (0.03)	LR 0.00010	Loss 0.039 (0.044)
+Iter 00007700	Time 0.03 (0.03)	LR 0.00010	Loss 0.043 (0.044)
+Iter 00007800	Time 0.03 (0.03)	LR 0.00010	Loss 0.029 (0.044)
+Iter 00007900	Time 0.03 (0.03)	LR 0.00010	Loss 0.035 (0.044)
+Iter 00008000	Time 0.03 (0.03)	LR 0.00010	Loss 0.039 (0.044)
+Iter 00008100	Time 0.03 (0.03)	LR 0.00010	Loss 0.046 (0.044)
+Iter 00008200	Time 0.03 (0.03)	LR 0.00010	Loss 0.040 (0.044)
+Iter 00008300	Time 0.03 (0.03)	LR 0.00010	Loss 0.037 (0.044)
+Iter 00008400	Time 0.03 (0.03)	LR 0.00010	Loss 0.030 (0.043)
+Iter 00008500	Time 0.03 (0.03)	LR 0.00010	Loss 0.033 (0.043)
+Iter 00008600	Time 0.03 (0.03)	LR 0.00010	Loss 0.038 (0.043)
+Iter 00008700	Time 0.03 (0.03)	LR 0.00010	Loss 0.032 (0.043)
+Iter 00008800	Time 0.03 (0.03)	LR 0.00010	Loss 0.037 (0.043)
+Iter 00008900	Time 0.03 (0.03)	LR 0.00010	Loss 0.032 (0.043)
+Iter 00009000	Time 0.03 (0.03)	LR 0.00010	Loss 0.036 (0.043)
+Iter 00009100	Time 0.03 (0.03)	LR 0.00010	Loss 0.032 (0.043)
+Iter 00009200	Time 0.03 (0.03)	LR 0.00010	Loss 0.036 (0.043)
+Iter 00009300	Time 0.03 (0.03)	LR 0.00010	Loss 0.034 (0.043)
+Iter 00009400	Time 0.38 (0.04)	LR 0.00010	Loss 0.029 (0.042)
+Iter 00009500	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.042)
+Iter 00009600	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.042)
+Iter 00009700	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.042)
+Iter 00009800	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.042)
+Iter 00009900	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.042)
+Iter 00010000	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.042)
+Iter 00010100	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.042)
+Iter 00010200	Time 0.03 (0.04)	LR 0.00010	Loss 0.042 (0.042)
+Iter 00010300	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.042)
+Iter 00010400	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.042)
+Iter 00010500	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.042)
+Iter 00010600	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.041)
+Iter 00010700	Time 0.03 (0.04)	LR 0.00010	Loss 0.042 (0.041)
+Iter 00010800	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.041)
+Iter 00010900	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.041)
+Iter 00011000	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.041)
+Iter 00011100	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.041)
+Iter 00011200	Time 0.03 (0.04)	LR 0.00010	Loss 0.041 (0.041)
+Iter 00011300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.041)
+Iter 00011400	Time 0.03 (0.04)	LR 0.00010	Loss 0.040 (0.041)
+Iter 00011500	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.041)
+Iter 00011600	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.041)
+Iter 00011700	Time 0.03 (0.04)	LR 0.00010	Loss 0.024 (0.041)
+Iter 00011800	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.041)
+Iter 00011900	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.041)
+Iter 00012000	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.040)
+Iter 00012100	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.040)
+Iter 00012200	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.040)
+Iter 00012300	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.040)
+Iter 00012400	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.040)
+Iter 00012500	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.040)
+Iter 00012600	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.040)
+Iter 00012700	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.040)
+Iter 00012800	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.040)
+Iter 00012900	Time 0.03 (0.04)	LR 0.00010	Loss 0.028 (0.040)
+Iter 00013000	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.040)
+Iter 00013100	Time 0.03 (0.04)	LR 0.00010	Loss 0.038 (0.040)
+Iter 00013200	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.040)
+Iter 00013300	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.040)
+Iter 00013400	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.040)
+Iter 00013500	Time 0.03 (0.04)	LR 0.00010	Loss 0.041 (0.040)
+Iter 00013600	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.040)
+Iter 00013700	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.040)
+Iter 00013800	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.040)
+Iter 00013900	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.040)
+Iter 00014000	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.039)
+Iter 00014100	Time 0.38 (0.04)	LR 0.00010	Loss 0.036 (0.039)
+Iter 00014200	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.039)
+Iter 00014300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.039)
+Iter 00014400	Time 0.03 (0.04)	LR 0.00010	Loss 0.026 (0.039)
+Iter 00014500	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.039)
+Iter 00014600	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.039)
+Iter 00014700	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.039)
+Iter 00014800	Time 0.03 (0.04)	LR 0.00010	Loss 0.038 (0.039)
+Iter 00014900	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.039)
+Iter 00015000	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.039)
+Iter 00015100	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.039)
+Iter 00015200	Time 0.03 (0.04)	LR 0.00010	Loss 0.022 (0.039)
+Iter 00015300	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.039)
+Iter 00015400	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.039)
+Iter 00015500	Time 0.03 (0.04)	LR 0.00010	Loss 0.042 (0.039)
+Iter 00015600	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.039)
+Iter 00015700	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.039)
+Iter 00015800	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.039)
+Iter 00015900	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.039)
+Iter 00016000	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.039)
+Iter 00016100	Time 0.03 (0.04)	LR 0.00010	Loss 0.028 (0.039)
+Iter 00016200	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.038)
+Iter 00016300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.038)
+Iter 00016400	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.038)
+Iter 00016500	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.038)
+Iter 00016600	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.038)
+Iter 00016700	Time 0.03 (0.04)	LR 0.00010	Loss 0.028 (0.038)
+Iter 00016800	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.038)
+Iter 00016900	Time 0.03 (0.04)	LR 0.00010	Loss 0.040 (0.038)
+Iter 00017000	Time 0.03 (0.04)	LR 0.00010	Loss 0.043 (0.038)
+Iter 00017100	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.038)
+Iter 00017200	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.038)
+Iter 00017300	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.038)
+Iter 00017400	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.038)
+Iter 00017500	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.038)
+Iter 00017600	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.038)
+Iter 00017700	Time 0.03 (0.04)	LR 0.00010	Loss 0.028 (0.038)
+Iter 00017800	Time 0.03 (0.04)	LR 0.00010	Loss 0.040 (0.038)
+Iter 00017900	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.038)
+Iter 00018000	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.038)
+Iter 00018100	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.038)
+Iter 00018200	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.038)
+Iter 00018300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.038)
+Iter 00018400	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.038)
+Iter 00018500	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.038)
+Iter 00018600	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.038)
+Iter 00018700	Time 0.04 (0.04)	LR 0.00010	Loss 0.033 (0.038)
+Iter 00018800	Time 0.40 (0.04)	LR 0.00010	Loss 0.026 (0.038)
+Iter 00018900	Time 0.03 (0.04)	LR 0.00010	Loss 0.026 (0.038)
+Iter 00019000	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.038)
+Iter 00019100	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.038)
+Iter 00019200	Time 0.03 (0.04)	LR 0.00010	Loss 0.028 (0.038)
+Iter 00019300	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.038)
+Iter 00019400	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.038)
+Iter 00019500	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.038)
+Iter 00019600	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.037)
+Iter 00019700	Time 0.03 (0.04)	LR 0.00010	Loss 0.040 (0.038)
+Iter 00019800	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.037)
+Iter 00019900	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.037)
+Iter 00020000	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.037)
+Iter 00020100	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00020200	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.037)
+Iter 00020300	Time 0.03 (0.04)	LR 0.00010	Loss 0.026 (0.037)
+Iter 00020400	Time 0.04 (0.04)	LR 0.00010	Loss 0.032 (0.037)
+Iter 00020500	Time 0.04 (0.04)	LR 0.00010	Loss 0.034 (0.037)
+Iter 00020600	Time 0.03 (0.04)	LR 0.00010	Loss 0.023 (0.037)
+Iter 00020700	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.037)
+Iter 00020800	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.037)
+Iter 00020900	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.037)
+Iter 00021000	Time 0.03 (0.04)	LR 0.00010	Loss 0.026 (0.037)
+Iter 00021100	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.037)
+Iter 00021200	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.037)
+Iter 00021300	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.037)
+Iter 00021400	Time 0.03 (0.04)	LR 0.00010	Loss 0.038 (0.037)
+Iter 00021500	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00021600	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.037)
+Iter 00021700	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00021800	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00021900	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00022000	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.037)
+Iter 00022100	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.037)
+Iter 00022200	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.037)
+Iter 00022300	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.037)
+Iter 00022400	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.037)
+Iter 00022500	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.037)
+Iter 00022600	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00022700	Time 0.03 (0.04)	LR 0.00010	Loss 0.023 (0.037)
+Iter 00022800	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.037)
+Iter 00022900	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.037)
+Iter 00023000	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00023100	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.036)
+Iter 00023200	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.036)
+Iter 00023300	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.036)
+Iter 00023400	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.036)
+Iter 00023500	Time 0.39 (0.04)	LR 0.00010	Loss 0.028 (0.036)
+Iter 00023600	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.036)
+Iter 00023700	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.036)
+Iter 00023800	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.036)
+Iter 00023900	Time 0.03 (0.04)	LR 0.00010	Loss 0.038 (0.036)
+Iter 00024000	Time 0.03 (0.04)	LR 0.00010	Loss 0.039 (0.036)
+Iter 00024100	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00024200	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.036)
+Iter 00024300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00024400	Time 0.03 (0.04)	LR 0.00010	Loss 0.023 (0.036)
+Iter 00024500	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00024600	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.036)
+Iter 00024700	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00024800	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.036)
+Iter 00024900	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00025000	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.036)
+Iter 00025100	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00025200	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00025300	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00025400	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.036)
+Iter 00025500	Time 0.03 (0.04)	LR 0.00010	Loss 0.027 (0.036)
+Iter 00025600	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.036)
+Iter 00025700	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.036)
+Iter 00025800	Time 0.03 (0.04)	LR 0.00010	Loss 0.021 (0.036)
+Iter 00025900	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.036)
+Iter 00026000	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.036)
+Iter 00026100	Time 0.03 (0.04)	LR 0.00010	Loss 0.029 (0.036)
+Iter 00026200	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00026300	Time 0.03 (0.04)	LR 0.00010	Loss 0.041 (0.036)
+Iter 00026400	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.036)
+Iter 00026500	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.036)
+Iter 00026600	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00026700	Time 0.03 (0.04)	LR 0.00010	Loss 0.033 (0.036)
+Iter 00026800	Time 0.03 (0.04)	LR 0.00010	Loss 0.036 (0.036)
+Iter 00026900	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.036)
+Iter 00027000	Time 0.03 (0.04)	LR 0.00010	Loss 0.043 (0.036)
+Iter 00027100	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.036)
+Iter 00027200	Time 0.03 (0.04)	LR 0.00010	Loss 0.030 (0.036)
+Iter 00027300	Time 0.03 (0.04)	LR 0.00010	Loss 0.035 (0.036)
+Iter 00027400	Time 0.03 (0.04)	LR 0.00010	Loss 0.032 (0.036)
+Iter 00027500	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.036)
+Iter 00027600	Time 0.03 (0.04)	LR 0.00010	Loss 0.037 (0.036)
+Iter 00027700	Time 0.03 (0.04)	LR 0.00010	Loss 0.031 (0.036)
+Iter 00027800	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00027900	Time 0.03 (0.04)	LR 0.00010	Loss 0.034 (0.036)
+Iter 00028000	Time 0.03 (0.04)	LR 0.00010	Loss 0.024 (0.036)
+Iter 00028100	Time 0.03 (0.04)	LR 0.00010	Loss 0.025 (0.036)
+All done!
++ cd ..
