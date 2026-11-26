@@ -179,24 +179,46 @@ Operating directly in pixel space on higher-resolution datasets ($128 \times 128
 
 ### 4.2 MiniImageNet Latent FM Results
 
-**Status: no MiniImageNet results are in the repo yet.** The table lists the configured settings. Training time and FID are left empty until the runs exist.
+**Status:** the ViT run is complete. The U-Net run and the FID scores are not in the repo yet.
 
 | Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
-| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | not available |
 
 Still to be added:
 
 | What | Who |
 |---|---|
 | U-Net run: loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`, training time and GPU | Akshat |
-| ViT run: the same files and numbers | Shubhangi |
 | FID for both final EMA checkpoints from `eval.py` (5,000 images each), with the `eval.py` output saved | Akshat |
 | Training curves and sample grids in this section | each run's owner |
-| Comparison of quality and compute cost | Shubhangi (ViT), Akshat (U-Net) |
+| Comparison of the two backbones in quality and compute cost | Akshat (U-Net), with the ViT results below |
 
 For the baseline FID, `test_cfg.cfg` has to be set to `False`, because the code defaults turn guidance on (scale 2.5).
+
+**ViT run.** Trained for 80 epochs (62,500 logged iterations, batch size 64, Adam, learning rate $2 \times 10^{-4}$ with 1 epoch of warmup, EMA decay 0.9996) on CHTC. Wall time is about 79 minutes including the periodic sampling. We set `TORCH_COMPILE_DISABLE=1`, because the autoencoder's `torch.compile` call needs a C compiler that the training container did not have. Files are in `results/miniimagenet_fm_vit_20261126_022239/`.
+
+![MiniImageNet ViT loss](figures/mini_vit_loss.png)
+
+| Around epoch | 1 | 10 | 20 | 40 | 80 |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Mean logged loss nearby | 0.998 | 0.900 | 0.891 | 0.873 | 0.863 |
+
+The loss drops quickly in the first few epochs and then goes down very slowly, with a lot of noise from one logged value to the next. The final running average printed by `train.py` is 0.886.
+
+*Epoch 5:*
+
+![ViT samples at epoch 5](figures/mini_vit_samples_epoch5.png)
+
+*Epoch 80:*
+
+![ViT samples at epoch 80](figures/mini_vit_samples.png)
+
+*EMA samples with 10 Euler steps. Columns are the first 10 of the 100 classes.*
+
+At epoch 5 the samples are only blurry color patches. By epoch 80 they have realistic colors and textures, and many have a clear foreground against a background. Most objects are still not recognizable, shapes are often distorted, and from this grid it is hard to tell that samples in one column share a class. The loss changes little late in training even though the samples keep sharpening, so the loss alone is not a good measure of quality. FID is still needed to put a number on it.
+
 
 ---
 
@@ -233,7 +255,7 @@ where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unco
 - **Ashvin Sehgal:**
   - Implemented U-Net decoder reverse pass in `libs/unet.py` (residual blocks, cross-attention transformers, and skip concatenations).
   - Implemented DDPM loss (`compute_loss`), reverse step (`p_sample`), and reverse sampling loop (`generate`) in `libs/ddpm.py`.
-  - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$).
+  - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$), and the 80-epoch MiniImageNet latent FM run with ViT.
   - Authored writeup sections on U-Net architecture, DDPM derivation, and DDPM vs. FM comparative analysis.
 - **Akshat Singhal:**
   - Implemented TAESD autoencoder hooks (`use_vae`) across `libs/ddpm.py` and `libs/fm.py`.
