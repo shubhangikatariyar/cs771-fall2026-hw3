@@ -72,7 +72,6 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 - [x] **Shubhangi:** Implemented `LightningDiT.forward` in `libs/vit.py` (2D pos embeddings, DiT adaLN-Zero blocks, final norm, unpatchify).
 - [x] **Shubhangi:** Implemented `compute_loss` and `generate` (Euler ODE with CFG) in `libs/fm.py`.
 - [x] **Akshat & Shubhangi:** Added TAESD encoding/decoding hooks for `use_vae` across `libs/ddpm.py` and `libs/fm.py`.
-- [x] **Verification:** Comprehensive unit test suite verified: all 7 test cases passed (UNet, ViT, DDPM, FM, Latent FM with TAESD, and CFG generation).
 
 ---
 
@@ -82,7 +81,7 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 - [x] **Ashvin:** Completed MNIST DDPM with U-Net (`results/mnist_ddpm_unet_20261123_195358/`, 30 epochs, final loss ~0.030, `model_final.pth.tar` and sample grids saved).
 - [x] **Shubhangi:** Completed MNIST FM with ViT (`results/mnist_fm_vit_20261125_153641/`, 30 epochs, 28,125 iters, loss 0.159, deliverables staged).
 - [x] **Ashvin:** Completed MNIST DDPM with ViT (`results/mnist_ddpm_vit_20261125_042303/`, 30 epochs, final loss ~0.036 running average, `model_final.pth.tar` and sample grids saved).
-- [x] **Shubhangi:** Completed MiniImageNet Latent FM with ViT (38,100 iters / ~49 epochs, loss converged to 0.861, checkpoints saved in Drive).
+- [x] **Ashvin:** Completed MiniImageNet Latent FM with ViT (80 epochs, ~79 min on NVIDIA L40S, running avg loss 0.886, `results/miniimagenet_fm_vit_20261126_022239/`).
 - [ ] **Akshat:** Launch `mnist_fm_unet` (30 epochs, 10 steps).
 - [ ] **Akshat:** Launch full MiniImageNet Latent FM with U-Net (80 epochs on CHTC).
 

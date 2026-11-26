@@ -149,8 +149,8 @@ With the same backbone, each network call costs about the same for both methods,
 
 **Training Convergence & Qualitative Evaluation (ViT + Flow Matching):**
 - **Architecture:** LightningDiT (depth 8, hidden dimension 192, 4 heads, patch size 2, total ~44MB weights).
-- **Convergence:** Trained for 30 epochs (28,125 iterations, batch size 64). The MSE velocity loss started at `0.781` at iteration 100 and smoothly converged to a final loss of `0.159` (moving average `0.177`).
-- **Visual Progression:** Samples generated at epoch 4 (`sample-4.png`) exhibit initial digit topology and spatial structure. By epoch 14 (`sample-14.png`), class conditioning cleanly separates digits 0 through 9. By final epoch 29 (`sample-29.png`), digit boundaries are sharp, noise-free, and exhibit high intra-class variation.
+- **Convergence:** Trained for 30 epochs (28,125 iterations, batch size 64). The MSE velocity loss started at `0.786` at iteration 100 and smoothly converged to a final loss of `0.159` (moving average `0.177`).
+- **Visual Progression:** Samples generated at epoch 4 (`sample-4.png`) are still mostly noise without recognizable digit shapes. By epoch 14 (`sample-14.png`), class conditioning cleanly separates digits 0 through 9. By final epoch 29 (`sample-29.png`), digit boundaries are sharp, noise-free, and exhibit high intra-class variation.
 - **Deliverables:** Final model checkpoint `model_final.pth.tar`, configuration `config.txt`, and sample progression grids (`sample-4.png` through `sample-29.png`) are archived in `results/mnist_fm_vit_20261125_153641/`.
 
 **ViT backbone: DDPM vs. FM.** Both runs use the same ViT, batch size, number of epochs and EMA decay, so the main differences are the objective and the sampler.
