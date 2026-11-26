@@ -179,12 +179,12 @@ Operating directly in pixel space on higher-resolution datasets ($128 \times 128
 
 ### 4.2 MiniImageNet Latent FM Results
 
-At the time of this submission the ViT run is complete. The U-Net run and the FID scores for both backbones are still pending and will be added in an updated submission.
+At the time of this submission the ViT run and its FID evaluation are complete. The U-Net run and its FID score are still pending and will be added in an updated submission.
 
 | Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | pending | pending |
-| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | pending |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | ~79 min (NVIDIA L40S) | **116.02** (no guidance) |
 
 **ViT run.** Trained for 80 epochs (62,500 logged iterations, batch size 64, Adam, learning rate $2 \times 10^{-4}$ with 1 epoch of warmup, EMA decay 0.9996) on CHTC. Wall time is about 79 minutes including the periodic sampling. We set `TORCH_COMPILE_DISABLE=1`, because the autoencoder's `torch.compile` call needs a C compiler that the training container did not have. Files are in `results/miniimagenet_fm_vit_20261126_022239/`.
 
@@ -206,7 +206,9 @@ The loss drops quickly in the first few epochs and then goes down very slowly, w
 
 *EMA samples with 10 Euler steps. Columns are the first 10 of the 100 classes.*
 
-At epoch 5 the samples are only blurry color patches. By epoch 80 they have realistic colors and textures, and many have a clear foreground against a background. Most objects are still not recognizable, shapes are often distorted, and from this grid it is hard to tell that samples in one column share a class. The loss changes little late in training even though the samples keep sharpening, so the loss alone is not a good measure of quality. FID is still needed to put a number on it.
+At epoch 5 the samples are only blurry color patches. By epoch 80 they have realistic colors and textures, and many have a clear foreground against a background. Most objects are still not recognizable, shapes are often distorted, and from this grid it is hard to tell that samples in one column share a class. The loss changes little late in training even though the samples keep sharpening, so the loss alone is not a good measure of quality. Without guidance, the final EMA model has an FID of 116.02.
+
+**FID setup.** We used `eval.py` with 50 generated images per class (5,000 in total) and 10 Euler steps, compared against the 5,000 MiniImageNet test images. Guidance was turned off for this baseline (`test_cfg.cfg: False`). Sampling ran on an Apple M4 GPU and `eval.py` computes the Inception features on the CPU. Each score comes from a single run. Configs and logs are in `results/fid_miniimagenet_fm_vit/`.
 
 ---
 
@@ -219,7 +221,34 @@ where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unco
 
 ### 5.2 Qualitative & Quantitative Evaluation
 
-Guidance is implemented for flow matching (`libs/fm.py`), but we have not evaluated it yet, so no FID values or sample comparisons are reported in this version.
+We evaluated guidance on the ViT checkpoint from Section 4.2, with no retraining. All settings use the FID setup described there. Guidance is applied for $t \ge 0.1$, which is 9 of the 10 Euler steps.
+
+| Guidance scale $s$ | FID (lower is better) | Change from baseline | Network evaluations per image |
+|:---:|:---:|:---:|:---:|
+| 1.0 (no guidance, baseline) | 116.02 | - | 10 |
+| 1.5 | 97.31 | -16% | 19 |
+| 2.5 | 72.59 | -37% | 19 |
+| 4.0 | **57.28** | -51% | 19 |
+
+The grids below use classes 0 to 9 (one per column) and start from the same noise, so only the guidance scale changes.
+
+*No guidance:*
+
+![No guidance](figures/cfg_vit_s1.0.png)
+
+*Scale 2.5:*
+
+![Guidance scale 2.5](figures/cfg_vit_s2.5.png)
+
+*Scale 4.0:*
+
+![Guidance scale 4.0](figures/cfg_vit_s4.0.png)
+
+- **Image quality:** guided samples have sharper objects, cleaner backgrounds and stronger colors. Many are still distorted, even at scale 4.0.
+- **Match to the requested class:** this improves the most. Without guidance it is hard to tell that a column shares a class. At scale 4.0 several columns clearly do, for example the red-headed birds in the first column and the toucan-like birds in the sixth.
+- **Diversity:** samples within a column become more alike as the scale grows, with repeated colors, backgrounds and layouts.
+- **Trade-off:** FID improved at every scale we tried and was still falling at 4.0, so we have not found the best scale. Larger values may lose too much diversity. The cost is almost twice as many network evaluations; on the M4 GPU, generation speed at scale 2.5 dropped from about 35 to 19 images per second.
+- **Limits:** one backbone, one random run per setting, and 5,000 samples, so small FID differences should not be over-read. The U-Net has not been evaluated.
 
 ---
 
@@ -235,7 +264,7 @@ Guidance is implemented for flow matching (`libs/fm.py`), but we have not evalua
 - **Ashvin Sehgal:**
   - Implemented U-Net decoder reverse pass in `libs/unet.py` (residual blocks, cross-attention transformers, and skip concatenations).
   - Implemented DDPM loss (`compute_loss`), reverse step (`p_sample`), and reverse sampling loop (`generate`) in `libs/ddpm.py`.
-  - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$), and the 80-epoch MiniImageNet latent FM run with ViT.
+  - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$), the 80-epoch MiniImageNet latent FM run with ViT, and its FID and guidance scale evaluation.
   - Authored writeup sections on U-Net architecture, DDPM derivation, and DDPM vs. FM comparative analysis.
 - **Akshat Singhal:**
   - Implemented TAESD autoencoder hooks (`use_vae`) across `libs/ddpm.py` and `libs/fm.py`.
