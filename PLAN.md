@@ -79,13 +79,13 @@ Tracks are independent code-wise. Backbones (`unet.py`, `vit.py`) and generative
 ## DAY 2 — MNIST verification + launch overnight MiniImageNet
 
 **Status: IN PROGRESS**
-- [x] **Ashvin:** Completed MNIST DDPM with U-Net on CHTC (`results/mnist_ddpm_unet_20261123_195358/`, 30 epochs, final loss ~0.030, `model_final.pth.tar` and sample grids saved).
-- [ ] **Ashvin:** Launch `mnist_ddpm_vit.sub` on CHTC (30 epochs, 500 steps).
-- [ ] **Shubhangi:** Launch `mnist_fm_vit.sub` on CHTC (30 epochs, 10 steps).
-- [ ] **Akshat:** Launch `mnist_fm_unet.sub` on CHTC (30 epochs, 10 steps).
+- [x] **Ashvin:** Completed MNIST DDPM with U-Net (`results/mnist_ddpm_unet_20261123_195358/`, 30 epochs, final loss ~0.030, `model_final.pth.tar` and sample grids saved).
+- [x] **Shubhangi:** Completed MNIST FM with ViT (`results/mnist_fm_vit_20261125_153641/`, 30 epochs, 28,125 iters, loss 0.159, deliverables staged).
+- [x] **Ashvin:** Completed MNIST DDPM with ViT (`results/mnist_ddpm_vit_20261125_042303/`, 30 epochs, final loss ~0.036 running average, `model_final.pth.tar` and sample grids saved).
+- [ ] **Akshat:** Launch `mnist_fm_unet` (30 epochs, 10 steps).
 - [ ] **Overnight Launches (CRITICAL COMPUTE WINDOW):**
-  - **Akshat:** Launch full MiniImageNet Latent FM with U-Net (`chtc/miniimagenet_fm_unet.sub`, 80 epochs).
-  - **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (`chtc/miniimagenet_fm_vit.sub`, 80 epochs).
+  - **Akshat:** Launch full MiniImageNet Latent FM with U-Net (80 epochs).
+  - **Shubhangi:** Launch full MiniImageNet Latent FM with ViT (80 epochs, in progress).
 
 **End-of-Day-2 checkpoint:** all code implemented; all MNIST runs complete; both 80-epoch MiniImageNet runs in progress. Start drafting writeup sections.
 

@@ -143,7 +143,26 @@ where unconditional evaluation passes $c = \text{num\_classes}$. When `use_vae=T
 
 With the same backbone, each network call costs about the same for both methods, so flow matching should sample roughly 50 times faster. This follows from the step counts; we have not timed it separately. The training losses of the two methods have different targets, so their values can't be compared directly.
 
-> **Not in the repo yet.** The MNIST FM runs are needed to finish this comparison. Shubhangi adds the `mnist_fm_vit` results and Akshat adds the `mnist_fm_unet` results to `results/` (loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`). Ashvin then adds the FM curves and grids here and compares digit quality with Section 2.4.
+**Training Convergence & Qualitative Evaluation (ViT + Flow Matching):**
+- **Architecture:** LightningDiT (depth 8, hidden dimension 192, 4 heads, patch size 2, total ~44MB weights).
+- **Convergence:** Trained for 30 epochs (28,125 iterations, batch size 64). The MSE velocity loss started at `0.781` at iteration 100 and smoothly converged to a final loss of `0.159` (moving average `0.177`).
+- **Visual Progression:** Samples generated at epoch 4 (`sample-4.png`) exhibit initial digit topology and spatial structure. By epoch 14 (`sample-14.png`), class conditioning cleanly separates digits 0 through 9. By final epoch 29 (`sample-29.png`), digit boundaries are sharp, noise-free, and exhibit high intra-class variation.
+- **Deliverables:** Final model checkpoint `model_final.pth.tar`, configuration `config.txt`, and sample progression grids (`sample-4.png` through `sample-29.png`) are archived in `results/mnist_fm_vit_20261125_153641/`.
+
+**ViT backbone: DDPM vs. FM.** Both runs use the same ViT, batch size, number of epochs and EMA decay, so the main differences are the objective and the sampler.
+
+| DDPM ViT, epoch 30 (500 steps) | FM ViT, epoch 30 (10 steps) |
+|:---:|:---:|
+| ![DDPM ViT samples](figures/ddpm_vit_samples.png) | ![FM ViT samples](figures/fm_vit_samples.png) |
+
+*Each column is one class, 0 to 9.*
+
+- **Early training:** at epoch 5 neither model produces readable digits. By epoch 10 most FM samples already look like the requested digit, although the background is grainy, while many DDPM samples are still malformed or the wrong class. DDPM is still behind at epoch 15.
+- **Final quality:** by epoch 30 the two grids are close. Both give clear, mostly class-correct digits, and both have a few broken or ambiguous ones. I can't pick a clear winner by eye.
+- **Cost:** FM gets this quality with 10 network evaluations instead of 500.
+- **Limits:** this is a visual comparison of one run per method, with no FID. The two runs were trained on different machines, so we don't compare their training times.
+
+> **Still missing:** the U-Net comparison needs the `mnist_fm_unet` results (Akshat) in `results/`. Ashvin then compares them with the DDPM U-Net grid in Section 2.4.
 
 ---
 
