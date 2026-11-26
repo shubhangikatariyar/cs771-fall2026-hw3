@@ -1,0 +1,4 @@
+cfg_scale=1.0 cfg_start_t=0.1 FID:  116.02317427882559
+cfg_scale=1.5 cfg_start_t=0.1 FID:  97.30762959862295
+cfg_scale=2.5 cfg_start_t=0.1 FID:  72.58772296843426
+cfg_scale=4.0 cfg_start_t=0.1 FID:  57.27658261614886
