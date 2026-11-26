@@ -1,0 +1,7 @@
+
+# MiniImageNet files too large for git (GitHub limit is 100 MB per file).
+# Keep them locally so zip_submission.py still includes them.
+miniimagenet_*/model_final.pth.tar
+miniimagenet_*/sample-*.png
+!miniimagenet_*/sample-4.png
+!miniimagenet_*/sample-79.png
