@@ -11,87 +11,106 @@
 
 Both generative modeling frameworks—Denoising Diffusion Probabilistic Models (DDPM) and Flow Matching (FM)—rely fundamentally on an underlying parameteric neural network $f_\theta(x, c, t)$ that predicts a vector field conditioned on an image/latent representation $x$, a categorical class label $c \in \{0, \dots, C-1\}$, and a continuous or discrete time variable $t$. While DDPM employs $f_\theta$ to predict the injected Gaussian noise $\epsilon$, Flow Matching uses $f_\theta$ to estimate the instantaneous velocity along a straight probability trajectory. We implement, analyze, and benchmark two contrasting prediction architectures: a convolutional U-Net with spatial cross-attention and a Vision Transformer (LightningDiT) with adaptive layer normalization.
 
-### 1.1 U-Net Decoder Architecture (`libs/unet.py`)
+### 1.1 U-Net Decoder (`libs/unet.py`)
 
-Our convolutional backbone builds upon the modern diffusion U-Net design popularized by Latent Diffusion Models (Rombach et al., 2022). The architecture follows a symmetric encoder-bottleneck-decoder topology equipped with residual convolutional blocks, multi-head self-attention, and cross-attention spatial transformers:
+For MNIST the U-Net uses a base width of 64 with multipliers (1, 2, 4), so the three levels have 64, 128 and 256 channels at 28×28, 14×14 and 7×7. It has about 7.46M trainable parameters.
 
-- **Time Conditioning:** The diffusion timestep $t$ is first mapped via sinusoidal positional embeddings into frequency space and then processed by a two-layer Multi-Layer Perceptron (MLP) with SiLU non-linearities, yielding a dense time embedding vector $t_{\text{emb}} \in \mathbb{R}^D$. Within each `ResidualBlock`, $t_{\text{emb}}$ is linearly projected to the channel dimension of the current layer and added element-wise into the intermediate feature maps directly after the initial group normalization and convolutional transformation.
-- **Class Conditioning:** Categorical class labels $c$ are embedded through a learnable embedding dictionary (`y_embedder`) supporting random label dropout (10%) during training to enable Classifier-Free Guidance. A projection layer `y_embedder_proj` maps the label embedding into a conditioning context token $c \in \mathbb{R}^{1 \times D_{\text{ctx}}}$. In each `SpatialTransformer` block, this context token acts as the key and value in a multi-head cross-attention mechanism where spatial feature pixels serve as queries.
-- **Decoder Reverse Pass & Skip Connections:** The decoder is implemented as a symmetric reversal of the downsampling stages. For each decoder stage, the spatial feature map $x$ is concatenated along the channel dimension with the corresponding cached feature map popped from the encoder's skip connections:
-  ```python
-  # Reverse pass over decoder stages matching cached encoder representations
-  for resblock, transformer, upsample in self.decoder:
-      skip = encoder_output.pop()
-      x = torch.cat([x, skip], dim=1)
-      x = resblock(x, t)
-      if transformer is not None:
-          x = transformer(x, c)
-      if upsample is not None:
-          x = upsample(x)
-  ```
-  The concatenation of skip connections directly routes fine-grained, high-frequency spatial textures from the encoder to the decoder, preventing blurring and loss of high-resolution structural details during generation.
+**What I implemented.** The encoder was already given. It saves one feature map per level, right before downsampling. The decoder walks through these in reverse order. At each level it:
 
----
+1. pops the last saved encoder feature and concatenates it with the current features along the channel dimension,
+2. runs the residual block, which takes the time embedding,
+3. runs the spatial transformer, if that level has one, which takes the class embedding,
+4. upsamples by 2 (nearest neighbor followed by a 3×3 conv), except at the last level.
 
-### 1.2 Vision Transformer Forward Pass (`libs/vit.py` - LightningDiT)
+```python
+for resblock, transformer, upsample in self.decoder:
+    x = torch.cat([x, encoder_output.pop()], dim=1)
+    x = resblock(x, t)
+    if transformer:
+        x = transformer(x, c)
+    if upsample:
+        x = upsample(x)
+```
 
-Our transformer backbone adapts the Diffusion Transformer (DiT) architecture (Peebles & Xie, ICCV 2023), specifically the optimized `LightningDiT` variant:
+The concatenation is why each decoder residual block expects twice as many input channels. The skip connections matter because downsampling throws away fine detail, and predicting noise needs that detail at full resolution.
 
-- **Patchification & 2D Positional Embeddings:** Given an input image or latent tensor $x \in \mathbb{R}^{B \times C \times H \times W}$, a convolutional patch embedder `x_embedder` with kernel size $p \times p$ (default $p=2$) and stride $p$ partitions the spatial grid into $T = (H/p) \times (W/p)$ non-overlapping patch tokens of dimension $D$. Standard 2D learnable positional embeddings `pos_embed` are added directly to preserve two-dimensional spatial topology.
-- **adaLN-Zero Conditioning:** Rather than prepending conditioning tokens to the sequence, `LightningDiT` modulates internal block activations via Adaptive Layer Normalization with Zero Initialization (adaLN-Zero). Continuous timestep $t$ and class label $y$ are embedded separately and summed to form a unified conditioning vector:
-  $$c_{\text{cond}} = t + y \in \mathbb{R}^{B \times D}$$
-  Inside each `DiTBlock`, $c_{\text{cond}}$ is passed through a dedicated SiLU-activated linear layer to regress six modulation parameters:
-  $$\left[\gamma_1, \beta_1, \alpha_1, \gamma_2, \beta_2, \alpha_2\right] = \text{Linear}(\text{SiLU}(c_{\text{cond}}))$$
-  Here, $(\gamma_1, \beta_1)$ scale and shift the normalized input to the multi-head self-attention module, while $\alpha_1$ gates the attention output residual:
-  $$x \leftarrow x + \alpha_1 \cdot \text{Attention}\left(\text{LayerNorm}(x) \cdot (1 + \gamma_1) + \beta_1\right)$$
-  Similarly, $(\gamma_2, \beta_2, \alpha_2)$ modulate and gate the subsequent MLP feed-forward network. Crucially, all linear projection weights for the gating parameters $\alpha_1, \alpha_2$ are initialized to zero. Consequently, each DiT block acts as an exact identity function at initialization, ensuring numerical stability and fast training convergence.
-- **Forward Pass Implementation & Unpatchify:**
-  ```python
-  c = t + y
-  for block in self.blocks:
-      x = block(x, c)
-  x = self.final_layer(x, c)
-  x = self.unpatchify(x)
-  return x
-  ```
-  After passing through all $L$ stacked transformer blocks, `DiTDecodingLayer` applies a final adaptive layer norm modulation from $c_{\text{cond}}$, linearly projects from dimension $D$ to $p^2 \cdot C$, and `unpatchify` rearranges the flat token sequence back into the spatial image tensor $(B, C, H, W)$.
+**How time gets in.** The timestep goes through a sinusoidal embedding and a small two-layer MLP. Every residual block projects this vector to its own channel count and adds it to the feature map after the first convolution, before the second group norm. It is a per-channel shift, the same at every spatial position. So every residual block in the network knows how noisy its input is.
+
+**How the class gets in.** The label goes through an embedding table and a two-layer projection, giving a single context vector. The spatial transformers use it as the key and value in cross-attention, with image features as queries. Since there is only one context token, the attention weight on it is always 1, so in practice every position receives the same projected class vector. Attention levels are the two higher resolutions plus the middle block. During training the label is dropped 10% of the time, which is what classifier-free guidance needs later.
+
+### 1.2 Vision Transformer Forward Pass (`libs/vit.py`, LightningDiT)
+
+The second backbone is a Diffusion Transformer [Peebles & Xie, ICCV 2023] with a few changes that come with the starter code. With the MNIST settings (8 blocks, width 192, 4 heads, patch size 2) it has about 5.50M trainable parameters. The MiniImageNet config uses 12 blocks and width 288, about 18.35M parameters.
+
+- **Patches:** a strided convolution (`x_embedder`) turns the input into tokens $Z \in \mathbb{R}^{B \times T \times D}$ with $T = (H/p)(W/p)$ and $p = 2$. That is 196 tokens for MNIST and 64 for the MiniImageNet latents.
+- **Position embeddings:** `pos_embed` is a **fixed** 2D sinusoidal embedding, stored as a buffer and not trained. Half of the channels encode the column and half encode the row. It is added to the tokens once, before the first block.
+- **Rotary embeddings:** each attention layer also applies 2D rotary position embeddings (RoPE) to the queries and keys. Unlike `pos_embed`, the RoPE frequencies are **learnable**.
+- **Block design:** the blocks use RMSNorm, RMSNorm on queries and keys (QK-norm), and a SwiGLU feed-forward layer.
+- **Time and class:** the two embeddings are summed, $c = t_{\text{emb}} + y_{\text{emb}}$. Each block uses $c$ to predict a shift, scale and gate for both attention and the feed-forward layer (adaLN-Zero). These modulation layers start at zero, so every block starts as the identity.
+
+```python
+c = t + y
+for block in self.blocks:
+    x = block(x, c)
+x = self.final_layer(x, c)
+x = self.unpatchify(x)
+```
+
+The final layer applies one more shift and scale from $c$ and projects each token to $p^2 \cdot C_{\text{latent or image}}$ values. `unpatchify` puts them back into shape $(B, C, H, W)$.
 
 ---
 
 ## 2. Denoising Diffusion Probabilistic Models (DDPM) (3 points)
 
-### 2.1 Mathematical Formulation & Simplified Training Loss
+### 2.1 Forward process
 
-DDPM (Ho et al., 2020) defines a forward noising process that iteratively corrupts clean data $x_0 \sim q(x_0)$ into standard Gaussian noise over discrete steps $t \in \{1, \dots, T\}$ according to a pre-defined variance schedule $\beta_1, \dots, \beta_T$:
-$$q(x_t \mid x_{t-1}) = \mathcal{N}\left(x_t; \sqrt{1 - \beta_t} x_{t-1}, \beta_t I\right)$$
-Using the reparameterization trick, the marginal distribution at any arbitrary step $t$ can be sampled in closed form:
-$$q(x_t \mid x_0) = \mathcal{N}\left(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I\right) \implies x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon, \quad \epsilon \sim \mathcal{N}(0, I)$$
-where $\alpha_t = 1 - \beta_t$ and $\bar{\alpha}_t = \prod_{s=1}^t \alpha_s$.
+DDPM [Ho et al., 2020] slowly adds Gaussian noise to an image over $T$ steps:
+$$q(x_t \mid x_{t-1}) = \mathcal{N}\left(\sqrt{1-\beta_t}\,x_{t-1},\ \beta_t I\right).$$
+With $\alpha_t = 1-\beta_t$ and $\bar\alpha_t = \prod_{s \le t}\alpha_s$, the Gaussians combine, so we can jump to any step directly:
+$$x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\epsilon, \qquad \epsilon \sim \mathcal{N}(0, I).$$
+This is what `q_sample` does. On MNIST we use $T=500$ and a linear schedule from $\beta = 10^{-4}$ to $0.02$.
 
-The neural network $\epsilon_\theta(x_t, c, t)$ is trained using the simplified mean squared error (MSE) objective:
-$$\mathcal{L}_{\text{simple}}(\theta) = \mathbb{E}_{t \sim \mathcal{U}\{0, T-1\}, x_0, \epsilon \sim \mathcal{N}(0, I)}\left[\left\|\epsilon - \epsilon_\theta(x_t, c, t)\right\|_2^2\right]$$
-In `libs/ddpm.py`, `compute_loss` samples random integer timesteps $t$, generates Gaussian noise $\epsilon$, constructs $x_t$ via `self.q_sample(x_start, t, noise)`, and evaluates the MSE between true noise and model prediction.
+### 2.2 Simplified loss (`compute_loss`)
 
-### 2.2 Reverse Denoising & Sampling Loop
+The variational bound compares the learned reverse step with the true posterior $q(x_{t-1}\mid x_t, x_0)$. Both are Gaussians, so each term is a weighted squared distance between their means, and it can be rewritten as an error on the noise. Ho et al. drop the weights, which gives
+$$\mathcal{L}_{\text{simple}} = \mathbb{E}_{t, x_0, \epsilon}\,\|\epsilon - \epsilon_\theta(x_t, c, t)\|^2.$$
 
-The generative reverse process models $p_\theta(x_{t-1} \mid x_t) = \mathcal{N}(x_{t-1}; \mu_\theta(x_t, c, t), \sigma_t^2 I)$. By matching the posterior distribution $q(x_{t-1} \mid x_t, x_0)$, the posterior mean is recovered via:
-$$\mu_\theta(x_t, c, t) = \frac{1}{\sqrt{\alpha_t}} \left(x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, c, t)\right)$$
-In `p_sample`, for all steps $t > 0$, stochastic noise $z \sim \mathcal{N}(0, I)$ is added with variance $\sigma_t^2 = \tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$:
-$$x_{t-1} = \mu_\theta(x_t, c, t) + \sigma_t z$$
-At the final step $t = 0$, $\sigma_0 = 0$ and no noise is added. The sampling loop in `generate` starts from pure noise $x_{T-1} \sim \mathcal{N}(0, I)$ and sequentially steps down to $x_0$ across $T = 500$ discrete reverse iterations.
+For each image in the batch I pick $t$ uniformly from $\{0, \dots, T-1\}$ (indices start at 0 in the code), sample $\epsilon$, build $x_t$ with `q_sample`, and take the mean squared error between $\epsilon$ and the network output (Algorithm 1).
 
-### 2.3 MNIST Experiments: DDPM Performance
+### 2.3 Reverse step and sampling (`p_sample`, `generate`)
 
-We train DDPM on MNIST with both U-Net and ViT backbones ($T = 500$ steps, 30 epochs):
+The true posterior mean depends on $x_0$, which we don't have while sampling. Solving the forward equation for $x_0$ and replacing $\epsilon$ with the prediction gives Equation 11:
+$$\mu_\theta(x_t, c, t) = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon_\theta(x_t, c, t)\right).$$
+`p_sample` computes this mean and then adds $\sqrt{\tilde\beta_t}\,z$, where $\tilde\beta_t = \beta_t (1-\bar\alpha_{t-1})/(1-\bar\alpha_t)$ is the posterior variance and $z \sim \mathcal{N}(0, I)$. At the last step ($t=0$) it returns only the mean.
 
-| Model Backbone | Epochs | Discrete Steps | Final Training Loss | Hardware & Wall Clock | Model Deliverable |
-|---|:---:|:---:|:---:|:---:|---|
-| **DDPM + U-Net** | 30 | 500 | **0.030** (avg 0.033) | NVIDIA L40S (~25 min) | `results/mnist_ddpm_unet_20261123_195358/model_final.pth.tar` |
-| **DDPM + ViT** | 30 | 500 | *0.035* | CHTC Cluster (~40 min) | `chtc/mnist_ddpm_vit.sub` |
+`generate` follows Algorithm 2. It starts from pure Gaussian noise and calls `p_sample` for $t = T-1$ down to $0$. The result is clipped to $[-1, 1]$ and rescaled to $[0, 1]$. Sampling one batch therefore takes 500 network evaluations.
 
-**Training Dynamics & Quality Analysis:**
-- On the NVIDIA L40S GPU, training loss decreased from $0.985$ at epoch 0 to $0.030$ at epoch 30.
-- Samples saved at 5-epoch intervals (`sample-4.png` to `sample-29.png`) illustrate clean progressive denoising: initial epochs display structural cloudiness, while final samples show high class consistency and sharp digit strokes.
+### 2.4 MNIST experiments
+
+Both backbones were trained for 30 epochs with the provided configs (batch size 64, Adam, learning rate $10^{-4}$ with 1 epoch of warmup, EMA decay 0.9996). Samples come from the EMA model.
+
+| Backbone | Parameters | Loss at ~epoch 5 | Final loss | GPU (CHTC) | Wall time |
+|---|:---:|:---:|:---:|:---:|:---:|
+| U-Net | 7.46M | 0.046 | **0.033** | NVIDIA L40S | ~27 min |
+| ViT | 5.50M | 0.049 | **0.036** | NVIDIA H200 | ~18 min |
+
+Loss values are the running average printed by `train.py`. Wall time includes the periodic sampling. The two jobs landed on different GPUs, so the times should not be used to compare the backbones.
+
+![DDPM training loss](figures/ddpm_loss.png)
+
+*Figure: DDPM training loss on MNIST. The curve is a running average over all iterations so far, so it lags behind the current loss.*
+
+| U-Net (epoch 30) | ViT (epoch 30) |
+|:---:|:---:|
+| ![U-Net samples](figures/ddpm_unet_samples.png) | ![ViT samples](figures/ddpm_vit_samples.png) |
+
+*Each column is one class, 0 to 9.*
+
+**Training behavior.** Both losses fall quickly in the first couple of epochs and then improve slowly. The ViT loss is lower for about the first 3 epochs, after which the U-Net passes it and stays ahead. After 5 epochs the U-Net grid already has digit-like shapes, although they are noisy and often the wrong class. The ViT grid at the same point is still mostly noise. Part of this is the EMA model lagging behind the trained weights early on, but that applies to both.
+
+**Final quality.** By epoch 30 both models produce clear digits on a clean background, mostly matching the requested class, with visible variation in slant and stroke width. Looking at the grids, the ViT has a few more broken or ambiguous digits than the U-Net.
+
+**Why the U-Net does a bit better here.** Convolutions assume that nearby pixels are related, and the skip connections carry fine detail straight to the output. The ViT has to learn more of this from data, using 2×2 patches. The U-Net also has about 1.36 times as many parameters, so this is not a size-matched comparison. We also did not compute FID on MNIST, so the quality comparison is based on visual inspection and one training run each.
 
 ---
 
@@ -117,95 +136,88 @@ In `libs/fm.py`:
 
 ---
 
-### 3.3 MNIST Experiments: DDPM vs. Flow Matching Comparison
+### 3.3 DDPM vs. Flow Matching on MNIST
 
-| Characteristic | DDPM (U-Net / ViT) | Rectified Flow (ViT / U-Net) | Performance Ratio |
-|---|---|---|:---:|
-| **Sampling Steps ($N$)** | 500 discrete reverse steps | **10 forward Euler steps** | **50× fewer steps** |
-| **Inference Time / Batch** | ~12.5 seconds | **~0.25 seconds** | **~50× faster** |
-| **Sampling Mechanism** | Stochastic Markovian reverse noise | Deterministic ODE trajectory | Deterministic path |
-| **Prediction Target** | Added noise $\epsilon$ | Trajectory velocity $x_{\text{data}} - z$ | Straight vector field |
-| **Visual Quality** | Sharp, high fidelity | Comparable sharpness & fidelity | Parity |
+| | DDPM | Rectified Flow |
+|---|---|---|
+| Network predicts | added noise $\epsilon$ | velocity $x_{\text{data}} - z$ |
+| Time | discrete, 500 steps | continuous in $[0, 1]$ |
+| Sampler | stochastic, fresh noise at each step | deterministic Euler ODE |
+| Network evaluations per sample batch | 500 | 10 |
 
-**Training Dynamics & Empirical Verification (ViT + Flow Matching):**
-- **Model Configuration:** `LightningDiT` backbone (depth 8, hidden dimension 192, 4 heads, patch size 2, parameter size ~44.4 MB).
-- **Convergence Metrics:** Trained across all 30 epochs (28,125 iterations, batch size 64). The MSE loss started at `0.781` at iteration 100, passed `0.306` by iteration 1,500, `0.201` by iteration 5,000, and smoothly converged to a final loss of **`0.159`** (moving average **`0.177`**).
-- **Visual Progression Across Epochs:** 
-  - `sample-4.png`: Early structural approximations showing initial digit clustering.
-  - `sample-14.png`: Coherent digit classes emerging with minimal background noise.
-  - `sample-29.png`: Crisp strokes, sharp topological loops (e.g. 8s and 0s), and clean dark backgrounds across all 10 digits with high intra-class variation.
-- **Deliverables:** Staged in `results/mnist_fm_vit_20261125_153641/` (`model_final.pth.tar`, `config.txt`, and sample progression grids).
+With the same backbone, each network call costs about the same for both methods, so flow matching should sample roughly 50 times faster. This follows from the step counts; we have not timed it separately. The training losses of the two methods have different targets, so their values can't be compared directly.
+
+**Training Convergence & Qualitative Evaluation (ViT + Flow Matching):**
+- **Architecture:** LightningDiT (depth 8, hidden dimension 192, 4 heads, patch size 2, total ~44MB weights).
+- **Convergence:** Trained for 30 epochs (28,125 iterations, batch size 64). The MSE velocity loss started at `0.781` at iteration 100 and smoothly converged to a final loss of `0.159` (moving average `0.177`).
+- **Visual Progression:** Samples generated at epoch 4 (`sample-4.png`) exhibit initial digit topology and spatial structure. By epoch 14 (`sample-14.png`), class conditioning cleanly separates digits 0 through 9. By final epoch 29 (`sample-29.png`), digit boundaries are sharp, noise-free, and exhibit high intra-class variation.
+- **Deliverables:** Final model checkpoint `model_final.pth.tar`, configuration `config.txt`, and sample progression grids (`sample-4.png` through `sample-29.png`) are archived in `results/mnist_fm_vit_20261125_153641/`.
+
+**ViT backbone: DDPM vs. FM.** Both runs use the same ViT, batch size, number of epochs and EMA decay, so the main differences are the objective and the sampler.
+
+| DDPM ViT, epoch 30 (500 steps) | FM ViT, epoch 30 (10 steps) |
+|:---:|:---:|
+| ![DDPM ViT samples](figures/ddpm_vit_samples.png) | ![FM ViT samples](figures/fm_vit_samples.png) |
+
+*Each column is one class, 0 to 9.*
+
+- **Early training:** at epoch 5 neither model produces readable digits. By epoch 10 most FM samples already look like the requested digit, although the background is grainy, while many DDPM samples are still malformed or the wrong class. DDPM is still behind at epoch 15.
+- **Final quality:** by epoch 30 the two grids are close. Both give clear, mostly class-correct digits, and both have a few broken or ambiguous ones. I can't pick a clear winner by eye.
+- **Cost:** FM gets this quality with 10 network evaluations instead of 500.
+- **Limits:** this is a visual comparison of one run per method, with no FID. The two runs were trained on different machines, so we don't compare their training times.
+
+> **Still missing:** the U-Net comparison needs the `mnist_fm_unet` results (Akshat) in `results/`. Ashvin then compares them with the DDPM U-Net grid in Section 2.4.
 
 ---
 
 ## 4. Latent Diffusion and Flow Matching on MiniImageNet (4 points)
 
 ### 4.1 Latent Space Modeling with TAESD
+Operating directly in pixel space on higher-resolution datasets ($128 \times 128$ RGB) imposes steep computational and memory overheads. We leverage a pretrained Tiny AutoEncoder for Stable Diffusion (**TAESD**):
+- **Compression:** Compresses $3 \times 128 \times 128$ images into $4 \times 16 \times 16$ latent representations (8× spatial downsampling on each side and $48\times$ fewer values).
+- **Integration:** In `compute_loss`, images are encoded without gradients: $z_0 = \text{self.vae.encode}(x_{\text{data}})$. Flow matching operates entirely in latent space. During `generate`, sampled latents $z_1$ are decoded back to pixel space via $\hat{x} = \text{self.vae.decode}(z_1)$ and clipped to $[0, 1]$.
 
-Scaling generative models to complex natural image distributions such as MiniImageNet ($3 \times 128 \times 128$ RGB, 100 categories) in pixel space creates severe computational bottlenecks. Operating directly in raw pixel space requires calculating self-attention over $64 \times 64 = 4,096$ patch tokens, imposing quadratic memory and compute overheads.
+### 4.2 MiniImageNet Latent FM Results
 
-We resolve this by incorporating the pretrained Tiny AutoEncoder for Stable Diffusion (**TAESD**):
-- **Spatial & Dimensional Compression:** TAESD encodes $3 \times 128 \times 128$ RGB images into a compact $4 \times 16 \times 16$ latent representation without backpropagating gradients. This represents an **$8\times$ spatial downsampling** and a **$12\times$ dimensional reduction** ($49,152 \to 1,024$ floats per sample).
-- **Sequence Length Reduction in DiT:** With patch size $p = 2$, the Vision Transformer operates on only:
-  $$T = \left(\frac{16}{2}\right) \times \left(\frac{16}{2}\right) = 8 \times 8 = \mathbf{64\text{ tokens}}$$
-  This is **$3\times$ shorter** than MNIST ($196$ tokens) and **$64\times$ shorter** than pixel-space MiniImageNet ($4,096$ tokens), yielding massive self-attention efficiency.
-- **Integration in Code:** In `compute_loss`, latent features $z_0 = \text{self.vae.encode}(x_{\text{start}})$ are computed under `torch.no_grad()`. In `generate`, sampled latents $z_1$ are mapped back to pixel space via $\hat{x} = \text{self.vae.decode}(z_1)$ and clipped to $[0, 1]$.
+**Status: no MiniImageNet results are in the repo yet.** The table lists the configured settings. Training time and FID are left empty until the runs exist.
 
----
+| Model | Parameters | Latent size | Epochs (config) | Euler steps | Training time | FID (lower is better) |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Latent FM + U-Net | 16.77M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
+| Latent FM + ViT | 18.35M | $4 \times 16 \times 16$ | 80 | 10 | not available | not available |
 
-### 4.2 MiniImageNet Latent FM Experimental Results
+Still to be added:
 
-Both U-Net and Vision Transformer architectures were evaluated on MiniImageNet using 10 Euler integration steps:
+| What | Who |
+|---|---|
+| U-Net run: loss log or TensorBoard events, sample grids, `config.txt`, `model_final.pth.tar`, training time and GPU | Akshat |
+| ViT run: the same files and numbers | Shubhangi |
+| FID for both final EMA checkpoints from `eval.py` (5,000 images each), with the `eval.py` output saved | Akshat |
+| Training curves and sample grids in this section | each run's owner |
+| Comparison of quality and compute cost | Shubhangi (ViT), Akshat (U-Net) |
 
-| Architecture | Model Type | Latent Dimension | Epochs / Iters | Hardware | Iter Speed | Final Loss | Checkpoint / Status |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| **Latent FM + ViT** | Rectified Flow | $4 \times 16 \times 16$ | **48.8 ep** (38,100 iters) | NVIDIA T4 GPU | ~0.47s / batch | **0.861** (avg 0.896) | `logs/miniimagenet_fm_vit_*/` (Safe in Drive) |
-| **Latent FM + U-Net** | Rectified Flow | $4 \times 16 \times 16$ | **80 ep** (62,480 iters) | NVIDIA L40S | ~0.10s / batch | **0.842** (avg 0.855) | `chtc/miniimagenet_fm_unet.sub` |
-
-**Training Dynamics & Loss Trajectory (ViT Latent Flow Matching):**
-- **Architecture:** 12-layer `LightningDiT` (hidden size 288, 4 attention heads, MLP ratio 4.0, patch size 2).
-- **Optimization:** Adam optimizer with $\beta_1 = 0.9, \beta_2 = 0.95$, base learning rate $2 \times 10^{-4}$ with a 1-epoch linear warmup, exponential moving average (EMA) decay $0.9996$.
-- **Loss Convergence Curve:**
-  - Iteration 100: Loss = `0.985` (initial random noise matching)
-  - Iteration 5,000: Loss = `0.942` (global color and scene layouts established)
-  - Iteration 16,000: Loss = `0.865` (avg `0.917`) (object contours and coarse silhouettes)
-  - Iteration 26,000: Loss = `0.883` (avg `0.905`) (intra-class visual refinement)
-  - Iteration 35,000: Loss = `0.787` (avg `0.898`) (fine-grained semantic structures)
-  - Iteration 38,100: Loss = **`0.861`** (moving average **`0.896`**)
-- **Perceptual Convergence Analysis:** The loss curve exhibits standard logarithmic convergence: after ~30,000 iterations, the velocity MSE stabilizes between $0.86$ and $0.89$. At this plateau, the model reliably captures primary category characteristics (e.g., animal silhouettes, foliage, vehicle textures), while subsequent iterations refine subtle high-frequency details.
-
-**Computational Cost and Hardware Budget Discussion:**
-- **Cloud Hardware Allocation Constraints:** Training on the Google Colab NVIDIA T4 GPU processed batches at $\sim 0.46 - 0.47$ seconds per iteration. Completing 38,100 iterations required **~5.2 hours of continuous GPU compute**, at which point the session reached Google Colab's cloud usage quota.
-- **Hardware Efficiency Trade-off:** 
-  - On the NVIDIA T4 GPU (Colab), a full 80-epoch run requires $\approx 8.2$ wall-clock hours. By saving checkpoints every 2 epochs to Google Drive, we captured the model at epoch 48.8, where training loss had already stabilized.
-  - In comparison, training on the UW–Madison CHTC cluster using an NVIDIA L40S GPU (48 GB VRAM) processed batches at $\sim 0.10$ seconds per iteration, completing 80 epochs in under $1.8$ hours.
-- **Visual Artifacts & Analysis:** MiniImageNet contains 100 highly diverse natural image classes (500 samples per class). Under finite training compute, generated samples exhibit accurate semantic palettes and coherent foreground objects; however, backgrounds occasionally display minor textural blurring due to TAESD compression and the compact 12-layer transformer capacity.
+For the baseline FID, `test_cfg.cfg` has to be set to `False`, because the code defaults turn guidance on (scale 2.5).
 
 ---
 
 ## 5. Bonus: Classifier-Free Guidance (CFG) (+2 points)
 
 ### 5.1 Formulation & Implementation
+Classifier-Free Guidance (Ho & Salimans, 2022) improves conditional generation quality by trading sample diversity for class fidelity:
+$$\tilde{v}_\theta(x_t, c, t) = v_\theta(x_t, \emptyset, t) + s \cdot \left(v_\theta(x_t, c, t) - v_\theta(x_t, \emptyset, t)\right)$$
+where $s \ge 1.0$ is the guidance scale, and $\emptyset$ corresponds to the unconditional null-class token (supported via 10% label dropout during training).
 
-Classifier-Free Guidance (Ho & Salimans, 2022) enhances class conditioning quality without requiring an auxiliary image classifier. During training, the conditioning label is randomly dropped with probability $p_{\text{uncond}} = 0.10$ and replaced with a null-class token $c = C$ (`num_classes`):
-$$v_{\text{uncond}} = v_\theta(x_t, \emptyset, t), \quad v_{\text{cond}} = v_\theta(x_t, c, t)$$
-During sampling, the velocity field is extrapolated away from the unconditional prior toward the class-conditioned trajectory using guidance scale $s \ge 1.0$:
-$$\tilde{v}_\theta(x_t, c, t) = v_{\text{uncond}} + s \cdot \left(v_{\text{cond}} - v_{\text{uncond}}\right)$$
+### 5.2 Qualitative & Quantitative Evaluation
 
-In `libs/fm.py`, we implement CFG with a trajectory start threshold `cfg_start_t = 0.1`:
-- For $t < 0.1$ (near pure noise $t=0$), guidance is disabled ($s = 1.0$) to avoid amplifying high-frequency noise and to preserve sample diversity.
-- For $t \ge 0.1$, the guided velocity $\tilde{v}$ directs the Euler trajectory toward the designated class mode.
+**Status: no guidance results are in the repo yet.** Guidance is implemented for flow matching (`libs/fm.py`), but there are no measurements to report.
 
-### 5.2 Qualitative & Quantitative Evaluation Across Guidance Scales
-
-| Guidance Scale ($s$) | Qualitative Saliency | Sample Diversity | Visual Artifacts |
-|:---:|---|---|---|
-| **$s = 1.0$ (Unguided)** | Soft, natural textures | Maximum diversity | Occasional class ambiguity |
-| **$s = 1.5$** | Noticeable contrast boost | High diversity | Clean, balanced edges |
-| **$s = 2.5$ (Optimal)** | **Sharp, distinct class features** | **Well-preserved** | **Optimal subject sharpness** |
-| **$s = 4.0$ (Excessive)** | Hyper-saturated colors | Reduced diversity | High-frequency edge overshooting |
-
-**Discussion:** At the optimal scale $s = 2.5$, CFG sharpens semantic boundaries and improves class fidelity by focusing probability mass on mode centers. At scales $s > 4.0$, mode collapse and color saturation artifacts occur.
+| What needs to be added (Akshat) | Details |
+|---|---|
+| Baseline FID | same checkpoints, `test_cfg.cfg: False` |
+| Guided FID | `test_cfg.cfg: True`, at each scale tested (for example 2.0, 2.5, 3.5), with `cfg_start_t` stated |
+| Sample grids | side by side, with and without guidance, same classes |
+| Discussion | image quality, match to the requested class, and diversity |
+| Files | configs and `eval.py` output in `results/` |
 
 ---
 
@@ -216,19 +228,18 @@ In `libs/fm.py`, we implement CFG with a trajectory start threshold `cfg_start_t
 - **Shubhangi Katariyar:**
   - Implemented `LightningDiT.forward` in `libs/vit.py` (patch projection, adaLN-Zero time/class modulation, transformer blocks, and unpatchify).
   - Implemented Flow Matching loss (`compute_loss`) and forward Euler ODE integration (`generate`) in `libs/fm.py`.
-  - Executed and validated full 30-epoch MNIST FM (ViT) training (loss $0.159$) and MiniImageNet Latent FM (ViT) training (~49 epochs, loss $0.861$).
-  - Authored writeup sections on Vision Transformer architecture, Flow Matching derivation, and MiniImageNet ViT experimental analysis.
+  - Executed and validated full 30-epoch MNIST FM (ViT) training (loss $0.159$).
+  - Authored writeup sections on Vision Transformer architecture and Flow Matching derivation.
 - **Ashvin Sehgal:**
   - Implemented U-Net decoder reverse pass in `libs/unet.py` (residual blocks, cross-attention transformers, and skip concatenations).
   - Implemented DDPM loss (`compute_loss`), reverse step (`p_sample`), and reverse sampling loop (`generate`) in `libs/ddpm.py`.
-  - Configured CHTC HTCondor scripts and executed full 30-epoch MNIST DDPM with U-Net (loss $0.030$).
+  - Configured CHTC HTCondor scripts and executed the full 30-epoch MNIST DDPM runs with U-Net and ViT (final running-average loss $0.033$ and $0.036$).
   - Authored writeup sections on U-Net architecture, DDPM derivation, and DDPM vs. FM comparative analysis.
 - **Akshat Singhal:**
   - Implemented TAESD autoencoder hooks (`use_vae`) across `libs/ddpm.py` and `libs/fm.py`.
   - Implemented Classifier-Free Guidance (CFG) bonus extrapolation and evaluation logic in `libs/fm.py`.
-  - Executed MiniImageNet Latent FM with U-Net on CHTC.
-  - Coordinated repository CI/CD branching rules, code reviews, and submission packaging.
+  - Coordinated repository CI/CD branching rules and code reviews.
 
 ### Additional Packages
 All implementations were built using standard open-source scientific Python packages without proprietary extensions:
-`torch`, `torchvision`, `numpy`, `PyYAML`, `scipy`, `tensorboard`, `tqdm`, `Pillow`, and `datasets`.
+`torch`, `torchvision`, `numpy`, `PyYAML`, `scipy`, `tensorboard`, `tqdm`, `Pillow`, `datasets`, and `matplotlib` (for the loss plot).
