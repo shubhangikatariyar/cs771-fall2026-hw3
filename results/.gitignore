@@ -5,3 +5,4 @@ miniimagenet_*/model_final.pth.tar
 miniimagenet_*/sample-*.png
 !miniimagenet_*/sample-4.png
 !miniimagenet_*/sample-79.png
+!miniimagenet_*/sample-3.png

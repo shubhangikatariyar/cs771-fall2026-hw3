@@ -1,0 +1,7 @@
+device: mps
+MNIST DDPM U-Net: 169.86 s per 100 images
+MNIST FM U-Net: 3.72 s per 100 images
+MNIST DDPM ViT: 243.81 s per 100 images
+MNIST FM ViT: 5.18 s per 100 images
+MiniImageNet FM U-Net, no CFG: 1.89 s per 100 images
+MiniImageNet FM U-Net, CFG 2.5: 3.07 s per 100 images
